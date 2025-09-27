@@ -14,12 +14,12 @@ SEMANTIC_DIR = PROCESSED_DIR / "semantic"
 SEMANTIC_DIR.mkdir(parents=True, exist_ok=True)
 
 # Model configuration
-MODEL_NAME = "all-MiniLM-L6-v2"  # Fast and lightweight model
-EMBEDDING_DIM = 384  # Dimension for all-MiniLM-L6-v2
+MODEL_NAME = "all-MiniLM-L6-v2"
+EMBEDDING_DIM = 384 
 
 
 def load_texts_and_metadata(source_file: Path) -> Tuple[List[str], List[str], List[Dict[str, Any]]]:
-    """Load texts and metadata from JSONL file."""
+    # Load texts and metadata from JSONL file.
     texts: List[str] = []
     ids: List[str] = []
     metadata: List[Dict[str, Any]] = []
@@ -47,11 +47,11 @@ def load_texts_and_metadata(source_file: Path) -> Tuple[List[str], List[str], Li
 
 
 def generate_embeddings(texts: List[str], model_name: str = MODEL_NAME) -> np.ndarray:
-    """Generate embeddings for texts using sentence-transformers."""
+    # Generate embeddings for texts using sentence-transformers.
     print(f"Loading model: {model_name}")
     model = SentenceTransformer(model_name)
     
-    print(f"Generating embeddings for {len(texts)} texts...")
+    print(f"Generating embeddings for {len(texts)} texts")
     embeddings = model.encode(texts, show_progress_bar=True, batch_size=32)
     
     # Normalize embeddings for cosine similarity
@@ -61,7 +61,7 @@ def generate_embeddings(texts: List[str], model_name: str = MODEL_NAME) -> np.nd
 
 
 def build_faiss_index(embeddings: np.ndarray) -> faiss.Index:
-    """Build FAISS index for efficient similarity search."""
+    # Build FAISS index for efficient similarity search.
     dimension = embeddings.shape[1]
     
     # Create IndexFlatIP for inner product (cosine similarity with normalized vectors)
@@ -74,7 +74,7 @@ def build_faiss_index(embeddings: np.ndarray) -> faiss.Index:
 
 
 def save_semantic_index(index: faiss.Index, ids: List[str], metadata: List[Dict], model_name: str) -> None:
-    """Save FAISS index and metadata to disk."""
+
     # Save FAISS index
     faiss.write_index(index, str(SEMANTIC_DIR / "faiss_index.bin"))
     
@@ -93,7 +93,7 @@ def save_semantic_index(index: faiss.Index, ids: List[str], metadata: List[Dict]
 
 
 def load_semantic_index() -> Tuple[faiss.Index, List[str], List[Dict], str]:
-    """Load FAISS index and metadata from disk."""
+
     # Load FAISS index
     index = faiss.read_index(str(SEMANTIC_DIR / "faiss_index.bin"))
     
@@ -112,7 +112,7 @@ def load_semantic_index() -> Tuple[faiss.Index, List[str], List[Dict], str]:
 
 
 def search_semantic(query: str, top_k: int = 5) -> List[Tuple[str, float, Dict[str, Any]]]:
-    """Search using semantic embeddings."""
+    # Search using semantic embeddings.
     index, ids, metadata, model_name = load_semantic_index()
     
     # Load model and encode query
@@ -133,7 +133,7 @@ def search_semantic(query: str, top_k: int = 5) -> List[Tuple[str, float, Dict[s
 
 
 def build_semantic_index(source_file: Path = CHUNKS_FILE, model_name: str = MODEL_NAME) -> None:
-    """Build semantic index from source file."""
+    # Build semantic index from source file.
     print(f"Building semantic index from {source_file}")
     
     # Load data
@@ -144,7 +144,7 @@ def build_semantic_index(source_file: Path = CHUNKS_FILE, model_name: str = MODE
     embeddings = generate_embeddings(texts, model_name)
     
     # Build FAISS index
-    print("Building FAISS index...")
+    print("Building FAISS index")
     index = build_faiss_index(embeddings)
     
     # Save everything
@@ -154,7 +154,7 @@ def build_semantic_index(source_file: Path = CHUNKS_FILE, model_name: str = MODE
 
 
 def add_documents_to_index(new_texts: List[str], new_metadata: List[Dict], model_name: str = MODEL_NAME) -> None:
-    """Add new documents to existing index (incremental update)."""
+    # Add new documents to existing index (incremental update).
     if not (SEMANTIC_DIR / "faiss_index.bin").exists():
         raise FileNotFoundError("No existing semantic index found. Run build first.")
     
@@ -195,13 +195,13 @@ if __name__ == "__main__":
     if args.action == "build":
         build_semantic_index(Path(args.source), args.model)
     elif args.action == "add":
-        # For adding documents, you'd need to provide new texts and metadata
+        # For adding documents
         print("Add functionality requires programmatic usage")
-    else:  # search
+    else:  
         if not args.query:
             raise SystemExit("--query is required for search")
         results = search_semantic(args.query, top_k=args.top_k)
         for rank, (item_id, score, meta) in enumerate(results, start=1):
             title = meta.get("title", "No title")[:50]
-            print(f"{rank}. {item_id}\t{score:.4f}\t{title}...")
+            print(f"{rank}. {item_id}\t{score:.4f}\t{title}")
 

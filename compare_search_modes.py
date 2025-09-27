@@ -14,9 +14,9 @@ from embed_hybrid import search_hybrid, search_hybrid_advanced
 
 # run all search modes and compare results
 def run_search_comparison(query, top_k=5):
-    print(f"\n{'='*80}")
+
     print(f"Search Query: '{query}'")
-    print(f"{'='*80}")
+
     
     results = {}
     timings = {}
@@ -28,7 +28,7 @@ def run_search_comparison(query, top_k=5):
         timings['TF-IDF'] = time.time() - start_time
         results['TF-IDF'] = tfidf_results
         print(f"\nTF-IDF Results (took {timings['TF-IDF']:.3f}s):")
-        print("-" * 40)
+
         for rank, (doc_id, score) in enumerate(tfidf_results, 1):
             print(f"{rank}. {doc_id}\t{score:.4f}")
     except Exception as e:
@@ -43,7 +43,7 @@ def run_search_comparison(query, top_k=5):
         timings['Semantic'] = time.time() - start_time
         results['Semantic'] = semantic_results
         print(f"\nSemantic Results (took {timings['Semantic']:.3f}s):")
-        print("-" * 40)
+
         for rank, (doc_id, score, meta) in enumerate(semantic_results, 1):
             title = meta.get("title", "No title")[:50]
             print(f"{rank}. {doc_id}\t{score:.4f}\t{title}")
@@ -59,7 +59,7 @@ def run_search_comparison(query, top_k=5):
         timings['Hybrid'] = time.time() - start_time
         results['Hybrid'] = hybrid_results
         print(f"\nHybrid Results (took {timings['Hybrid']:.3f}s):")
-        print("-" * 40)
+  
         for rank, (doc_id, score, meta) in enumerate(hybrid_results, 1):
             title = meta.get("title", "No title")[:50]
             print(f"{rank}. {doc_id}\t{score:.4f}\t{title}")
@@ -75,7 +75,7 @@ def run_search_comparison(query, top_k=5):
         timings['Advanced Hybrid'] = time.time() - start_time
         results['Advanced Hybrid'] = adv_hybrid_results
         print(f"\nAdvanced Hybrid Results (took {timings['Advanced Hybrid']:.3f}s):")
-        print("-" * 40)
+
         for rank, (doc_id, score, meta) in enumerate(adv_hybrid_results, 1):
             title = meta.get("title", "No title")[:50]
             print(f"{rank}. {doc_id}\t{score:.4f}\t{title}")
@@ -85,9 +85,9 @@ def run_search_comparison(query, top_k=5):
         timings['Advanced Hybrid'] = 0
     
     # Performance Summary
-    print(f"\n{'='*80}")
+
     print("Performance Summary")
-    print(f"{'='*80}")
+
     for mode, timing in timings.items():
         print(f"{mode:15}: {timing:.3f}s")
     
@@ -95,9 +95,9 @@ def run_search_comparison(query, top_k=5):
 
 # analyze overlap between different search modes
 def analyze_result_overlap(results):
-    print(f"\n{'='*80}")
+ 
     print("Result Overlap Analysis")
-    print(f"{'='*80}")
+
     
     # extract document IDs from results
     doc_sets = {}
@@ -126,7 +126,7 @@ def main():
     args = parser.parse_args()
     
     print("Patent Search Mode Comparison")
-    print("="*80)
+
     
     all_results = {}
     all_timings = {}
@@ -140,9 +140,9 @@ def main():
         analyze_result_overlap(results)
     
     # overall performance summary
-    print(f"\n{'='*80}")
+
     print("Overall Performance Summary")
-    print(f"{'='*80}")
+ 
     
     avg_timings = {}
     for mode in ["TF-IDF", "Semantic", "Hybrid", "Advanced Hybrid"]:

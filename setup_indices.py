@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""
-Setup script to build all search indices for the patent NLP project.
-This script will build TF-IDF, semantic, and prepare for hybrid search.
-"""
+
+# Setup script to build all search indices for the patent NLP project.
+
 
 import sys
 from pathlib import Path
@@ -17,7 +16,7 @@ from preprocess_patents import process_file, OUTPUT_FILE
 
 
 def check_data_files():
-    """Check if required data files exist."""
+    # Check if required data files exist
     processed_dir = Path("./data/processed")
     grants_file = processed_dir / "grants.jsonl"
     apps_file = processed_dir / "applications.jsonl"
@@ -34,15 +33,15 @@ def check_data_files():
 
 
 def build_tfidf_index():
-    """Build TF-IDF index."""
-    print("\n" + "="*60)
+
+
     print("Building TF-IDF Index")
-    print("="*60)
+
     
     try:
         # Check if chunks exist, if not create them
         if not OUTPUT_FILE.exists():
-            print("Creating text chunks...")
+            print("Creating text chunks")
             with open(OUTPUT_FILE, "w", encoding="utf-8") as out:
                 for fname in ["grants.jsonl", "applications.jsonl"]:
                     input_file = Path("./data/processed") / fname
@@ -57,27 +56,27 @@ def build_tfidf_index():
         vectorizer, matrix = build_tfidf(ids, texts)
         save_index(vectorizer, matrix, ids)
         
-        print("✅ TF-IDF index built successfully")
+        print("TF-IDF index built successfully")
         return True
         
     except Exception as e:
-        print(f"❌ Error building TF-IDF index: {e}")
+        print(f"Error building TF-IDF index: {e}")
         return False
 
 
 def build_semantic_index_wrapper():
-    """Build semantic index."""
-    print("\n" + "="*60)
+
+
     print("Building Semantic Index")
-    print("="*60)
+
     
     try:
         build_semantic_index()
-        print("✅ Semantic index built successfully")
+        print("Semantic index built successfully")
         return True
         
     except Exception as e:
-        print(f"❌ Error building semantic index: {e}")
+        print(f"Error building semantic index: {e}")
         return False
 
 
@@ -89,7 +88,7 @@ def main():
     args = parser.parse_args()
     
     print("Patent NLP Project - Index Setup")
-    print("="*60)
+
     
     # Check data files
     if not args.skip_checks and not check_data_files():
@@ -111,19 +110,19 @@ def main():
             success_count += 1
     
     # Summary
-    print("\n" + "="*60)
+
     print("Setup Summary")
-    print("="*60)
+
     print(f"Successfully built {success_count}/{total_tasks} indices")
     
     if success_count == total_tasks:
-        print("✅ All indices built successfully!")
-        print("\nYou can now use the search CLI:")
-        print("  python search_cli.py 'your query' --mode tfidf")
-        print("  python search_cli.py 'your query' --mode semantic")
-        print("  python search_cli.py 'your query' --mode hybrid")
+        print("All indices built successfully")
+        print("\nSearch CLI USage:")
+        print("  python search_cli.py 'query' --mode tfidf")
+        print("  python search_cli.py 'query' --mode semantic")
+        print("  python search_cli.py 'query' --mode hybrid")
     else:
-        print("❌ Some indices failed to build. Check the errors above.")
+        print("Some indices failed to build. Check the errors above.")
         sys.exit(1)
 
 

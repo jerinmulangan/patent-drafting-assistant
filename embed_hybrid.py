@@ -17,7 +17,7 @@ def search_hybrid(query: str, top_k: int = 5, alpha: float = 0.5) -> List[Tuple[
         alpha: Weight for semantic search (0.0 = only TF-IDF, 1.0 = only semantic)
     """
     # Get TF-IDF results
-    tfidf_results = search_tfidf(query, top_k=top_k * 2)  # Get more for better combination
+    tfidf_results = search_tfidf(query, top_k=top_k * 2) 
     tfidf_scores = {doc_id: score for doc_id, score in tfidf_results}
     
     # Get semantic results
@@ -130,8 +130,8 @@ if __name__ == "__main__":
         )
     
     print(f"\nHybrid search results for: '{args.query}'")
-    print("-" * 80)
+
     for rank, (item_id, score, meta) in enumerate(results, start=1):
         title = meta.get("title", "No title")[:60]
-        print(f"{rank}. {item_id}\t{score:.4f}\t{title}...")
+        print(f"{rank}. {item_id}\t{score:.4f}\t{title}")
 

@@ -5,22 +5,22 @@ from embed_hybrid import search_hybrid, search_hybrid_advanced
 
 
 def format_results(results, mode_name):
-    """Format search results for display."""
+
     print(f"\n{mode_name} search results:")
-    print("-" * 80)
+
     
     if len(results) == 0:
         print("No results found.")
         return
     
     for rank, result in enumerate(results, start=1):
-        if len(result) == 2:  # TF-IDF results (doc_id, score)
+        if len(result) == 2:  
             item_id, score = result
             print(f"{rank}. {item_id}\t{score:.4f}")
-        else:  # Semantic/Hybrid results (doc_id, score, metadata)
+        else:  
             item_id, score, meta = result
             title = meta.get("title", "No title")[:60]
-            print(f"{rank}. {item_id}\t{score:.4f}\t{title}...")
+            print(f"{rank}. {item_id}\t{score:.4f}\t{title}")
 
 
 if __name__ == "__main__":

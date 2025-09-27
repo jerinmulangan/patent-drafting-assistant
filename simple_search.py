@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Simple working search script for testing."""
+# Simple working search script for testing
 
 import sys
 from pathlib import Path
