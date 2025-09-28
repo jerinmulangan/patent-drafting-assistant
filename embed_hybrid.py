@@ -7,21 +7,26 @@ from embed_tfidf import load_index as load_tfidf_index, search as search_tfidf
 from embed_semantic import load_semantic_index, search_semantic
 
 
-def search_hybrid(query: str, top_k: int = 5, alpha: float = 0.5) -> List[Tuple[str, float, Dict[str, Any]]]:
+def search_hybrid(query: str, top_k: int = 5, alpha: float = 0.5, 
+                  rerank: bool = False, keyword_weight: float = 0.3, semantic_weight: float = 0.7) -> List[Tuple[str, float, Dict[str, Any]]]:
     """
-    Hybrid search combining TF-IDF and semantic search.
+    Hybrid search combining TF-IDF and semantic search with optional re-ranking.
     
     Args:
         query: Search query
         top_k: Number of results to return
         alpha: Weight for semantic search (0.0 = only TF-IDF, 1.0 = only semantic)
+        rerank: Whether to apply keyword-based re-ranking
+        keyword_weight: Weight for keyword overlap in re-ranking
+        semantic_weight: Weight for semantic score in re-ranking
     """
     # Get TF-IDF results
     tfidf_results = search_tfidf(query, top_k=top_k * 2) 
     tfidf_scores = {doc_id: score for doc_id, score in tfidf_results}
     
-    # Get semantic results
-    semantic_results = search_semantic(query, top_k=top_k * 2)
+    # Get semantic results with optional re-ranking
+    semantic_results = search_semantic(query, top_k=top_k * 2, rerank=rerank, 
+                                     keyword_weight=keyword_weight, semantic_weight=semantic_weight)
     semantic_scores = {doc_id: score for doc_id, score, _ in semantic_results}
     semantic_metadata = {doc_id: meta for doc_id, _, meta in semantic_results}
     
