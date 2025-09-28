@@ -280,7 +280,7 @@ def analyze_query_log(log_file: str = "query_log.jsonl") -> Dict[str, Any]:
 
 if __name__ == "__main__":
     # Test the utilities
-    print("Testing search utilities...")
+    print("Testing search utilities")
     
     # Test metadata loading
     metadata = load_patent_metadata()

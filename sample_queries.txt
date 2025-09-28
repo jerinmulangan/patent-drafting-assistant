@@ -1,5 +1,4 @@
 # Sample patent search queries for testing
-# Lines starting with # are comments and will be ignored
 
 machine learning algorithm
 neural network processing

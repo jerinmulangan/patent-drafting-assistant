@@ -125,20 +125,43 @@ def search_semantic(query: str, top_k: int = 5, rerank: bool = False,
     search_k = top_k * 2 if rerank else top_k
     scores, indices = index.search(query_embedding.astype('float32'), search_k)
     
-    # Get initial results
+    # Load patent metadata for enrichment
+    from search_utils import load_patent_metadata, get_chunk_text, rerank_results
+    patent_metadata = load_patent_metadata()
+    
+    # Get initial results with enriched metadata
     results = []
     for score, idx in zip(scores[0], indices[0]):
         if idx < len(ids):  # Valid index
-            results.append((ids[idx], float(score), metadata[idx]))
+            doc_id = ids[idx]
+            chunk_meta = metadata[idx]
+            
+            # Get base document ID
+            base_doc_id = doc_id.split('_chunk')[0] if '_chunk' in doc_id else doc_id
+            
+            # Get patent metadata
+            patent_meta = patent_metadata.get(base_doc_id, {})
+            
+            # Get chunk text
+            chunk_text = get_chunk_text(doc_id)
+            
+            # Combine metadata
+            enriched_meta = {
+                "title": patent_meta.get("title", ""),
+                "doc_type": patent_meta.get("doc_type", "unknown"),
+                "source_file": patent_meta.get("source_file", ""),
+                "chunk_text": chunk_text or "",
+                "base_doc_id": base_doc_id
+            }
+            
+            results.append((doc_id, float(score), enriched_meta))
     
     # Apply re-ranking if requested
     if rerank:
-        from search_utils import rerank_results, get_chunk_text
-        
         # Prepare data for re-ranking
         rerank_data = []
         for doc_id, score, meta in results:
-            chunk_text = get_chunk_text(doc_id)
+            chunk_text = meta.get("chunk_text", "")
             if chunk_text:
                 rerank_data.append((doc_id, score, chunk_text))
         
@@ -150,7 +173,6 @@ def search_semantic(query: str, top_k: int = 5, rerank: bool = False,
         
         # Rebuild results with re-ranked scores
         reranked_results = []
-        score_map = {doc_id: score for doc_id, score, _ in rerank_data}
         
         for doc_id, new_score in reranked_scores:
             # Find original metadata
