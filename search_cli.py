@@ -58,7 +58,7 @@ if __name__ == "__main__":
             
     except FileNotFoundError as e:
         print(f"Error: {e}")
-        print("Make sure you have built the required indices:")
+        print("Make sure required indices are built:")
         print("  - For TF-IDF: python embed_tfidf.py build")
         print("  - For semantic: python embed_semantic.py build")
         print("  - For hybrid: Both TF-IDF and semantic indices are required")

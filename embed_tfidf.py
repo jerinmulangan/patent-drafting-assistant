@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 from argparse import ArgumentParser
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Any
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -57,12 +57,44 @@ def load_index():
     return vectorizer, matrix, ids
 
 
-def search(query: str, top_k: int = 5) -> List[Tuple[str, float]]:
+def search(query: str, top_k: int = 5, include_metadata: bool = False) -> List[Tuple[str, float]]:
     vectorizer, matrix, ids = load_index()
     query_vec = vectorizer.transform([query])
     sims = cosine_similarity(query_vec, matrix).ravel()
     top_idx = sims.argsort()[::-1][:top_k]
     return [(ids[i], float(sims[i])) for i in top_idx]
+
+
+def search_with_metadata(query: str, top_k: int = 5) -> List[Tuple[str, float, Dict[str, Any]]]:
+    """Search with metadata included in results."""
+    from search_utils import load_patent_metadata, get_chunk_text
+    
+    # Get basic search results
+    results = search(query, top_k=top_k)
+    metadata = load_patent_metadata()
+    
+    # Enrich results with metadata
+    enriched_results = []
+    for doc_id, score in results:
+        # Get base document metadata
+        base_doc_id = doc_id.split('_chunk')[0] if '_chunk' in doc_id else doc_id
+        base_meta = metadata.get(base_doc_id, {})
+        
+        # Get chunk text
+        chunk_text = get_chunk_text(doc_id)
+        
+        # Combine metadata
+        result_metadata = {
+            "title": base_meta.get("title", "No title"),
+            "doc_type": base_meta.get("doc_type", "unknown"),
+            "source_file": base_meta.get("source_file", ""),
+            "chunk_text": chunk_text or "",
+            "base_doc_id": base_doc_id
+        }
+        
+        enriched_results.append((doc_id, score, result_metadata))
+    
+    return enriched_results
 
 
 if __name__ == "__main__":

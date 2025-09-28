@@ -47,7 +47,7 @@ def load_texts_and_metadata(source_file: Path) -> Tuple[List[str], List[str], Li
 
 
 def generate_embeddings(texts: List[str], model_name: str = MODEL_NAME) -> np.ndarray:
-    # Generate embeddings for texts using sentence-transformers.
+    # Generate embeddings for texts using sentence-transformers
     print(f"Loading model: {model_name}")
     model = SentenceTransformer(model_name)
     
@@ -61,7 +61,7 @@ def generate_embeddings(texts: List[str], model_name: str = MODEL_NAME) -> np.nd
 
 
 def build_faiss_index(embeddings: np.ndarray) -> faiss.Index:
-    # Build FAISS index for efficient similarity search.
+    # Build FAISS index for efficient similarity search
     dimension = embeddings.shape[1]
     
     # Create IndexFlatIP for inner product (cosine similarity with normalized vectors)
@@ -111,8 +111,9 @@ def load_semantic_index() -> Tuple[faiss.Index, List[str], List[Dict], str]:
     return index, ids, metadata, model_name
 
 
-def search_semantic(query: str, top_k: int = 5) -> List[Tuple[str, float, Dict[str, Any]]]:
-    # Search using semantic embeddings.
+def search_semantic(query: str, top_k: int = 5, rerank: bool = False, 
+                   keyword_weight: float = 0.3, semantic_weight: float = 0.7) -> List[Tuple[str, float, Dict[str, Any]]]:
+    # Search using semantic embeddings with optional re-ranking.
     index, ids, metadata, model_name = load_semantic_index()
     
     # Load model and encode query
@@ -120,20 +121,51 @@ def search_semantic(query: str, top_k: int = 5) -> List[Tuple[str, float, Dict[s
     query_embedding = model.encode([query])
     query_embedding = query_embedding / np.linalg.norm(query_embedding, axis=1, keepdims=True)
     
-    # Search FAISS index
-    scores, indices = index.search(query_embedding.astype('float32'), top_k)
+    # Search FAISS index (get more results if re-ranking)
+    search_k = top_k * 2 if rerank else top_k
+    scores, indices = index.search(query_embedding.astype('float32'), search_k)
     
-    # Return results with metadata
+    # Get initial results
     results = []
     for score, idx in zip(scores[0], indices[0]):
         if idx < len(ids):  # Valid index
             results.append((ids[idx], float(score), metadata[idx]))
     
+    # Apply re-ranking if requested
+    if rerank:
+        from search_utils import rerank_results, get_chunk_text
+        
+        # Prepare data for re-ranking
+        rerank_data = []
+        for doc_id, score, meta in results:
+            chunk_text = get_chunk_text(doc_id)
+            if chunk_text:
+                rerank_data.append((doc_id, score, chunk_text))
+        
+        # Re-rank based on keyword overlap
+        reranked_scores = rerank_results(
+            [(doc_id, score) for doc_id, score, _ in rerank_data],
+            query, keyword_weight, semantic_weight
+        )
+        
+        # Rebuild results with re-ranked scores
+        reranked_results = []
+        score_map = {doc_id: score for doc_id, score, _ in rerank_data}
+        
+        for doc_id, new_score in reranked_scores:
+            # Find original metadata
+            original_meta = next((meta for d_id, _, meta in results if d_id == doc_id), {})
+            reranked_results.append((doc_id, new_score, original_meta))
+        
+        results = reranked_results[:top_k]
+    else:
+        results = results[:top_k]
+    
     return results
 
 
 def build_semantic_index(source_file: Path = CHUNKS_FILE, model_name: str = MODEL_NAME) -> None:
-    # Build semantic index from source file.
+    # Build semantic index from source file
     print(f"Building semantic index from {source_file}")
     
     # Load data
