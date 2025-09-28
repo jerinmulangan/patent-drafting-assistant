@@ -49,13 +49,13 @@ def generate_snippet(text: str, query: str, max_length: int = 200) -> str:
     query_terms = re.findall(r'\b\w+\b', query.lower())
     
     # Find the best position to start the snippet
-    text_lower = text.lower()
+    # Memory-efficient: only lowercase the snippet window, not the entire text
     best_start = 0
     max_matches = 0
     
     # Look for positions with most query term matches
     for i in range(0, len(text) - max_length + 1, 50):  # Check every 50 chars
-        snippet_text = text_lower[i:i + max_length]
+        snippet_text = text[i:i + max_length].lower()  # Only lowercase the snippet window
         matches = sum(1 for term in query_terms if term in snippet_text)
         if matches > max_matches:
             max_matches = matches
@@ -148,8 +148,17 @@ def compute_keyword_overlap_score(text: str, query: str) -> float:
     if not text or not query:
         return 0.0
     
-    # Tokenize and normalize
-    text_tokens = set(re.findall(r'\b\w+\b', text.lower()))
+    # Tokenize and normalize (memory-efficient for large texts)
+    if len(text) > 1000000:  # 1MB threshold
+        # Process in chunks for very large texts
+        text_tokens = set()
+        chunk_size = 100000
+        for i in range(0, len(text), chunk_size):
+            chunk = text[i:i + chunk_size].lower()
+            text_tokens.update(re.findall(r'\b\w+\b', chunk))
+    else:
+        text_tokens = set(re.findall(r'\b\w+\b', text.lower()))
+    
     query_tokens = set(re.findall(r'\b\w+\b', query.lower()))
     
     # Remove very short tokens
