@@ -26,6 +26,10 @@ sentence-transformers>=2.2.0
 # Vector similarity search
 faiss-cpu>=1.7.0
 
+# Web API framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
 # Optional: For better performance (if you have CUDA)
 # faiss-gpu>=1.7.0  # Uncomment if you have CUDA and want GPU acceleration
 
