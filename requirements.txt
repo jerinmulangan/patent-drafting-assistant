@@ -1,0 +1,49 @@
+# Patent NLP Project - Complete Requirements
+# Install with: pip install -r requirements.txt
+
+# Core Python packages (usually included with Python)
+# argparse - built-in
+# json - built-in  
+# os - built-in
+# re - built-in
+# sys - built-in
+# time - built-in
+# pathlib - built-in (Python 3.4+)
+# collections - built-in
+# csv - built-in
+# subprocess - built-in
+# xml.etree.ElementTree - built-in
+# pickle - built-in
+
+# Scientific computing and data processing
+numpy>=1.21.0
+scikit-learn>=1.0.0
+
+# Natural language processing
+nltk>=3.7
+sentence-transformers>=2.2.0
+
+# Vector similarity search
+faiss-cpu>=1.7.0
+
+# Optional: For better performance (if you have CUDA)
+# faiss-gpu>=1.7.0  # Uncomment if you have CUDA and want GPU acceleration
+
+# Development and testing (optional)
+# pytest>=6.0.0  # Uncomment if you want to run tests
+# jupyter>=1.0.0  # Uncomment if you want to use Jupyter notebooks
+
+# Note: The following packages are downloaded automatically by NLTK:
+# - punkt (tokenizer)
+# - punkt_tab (tokenizer)  
+# - stopwords (stop word lists)
+# - wordnet (lemmatizer)
+# - omw-1.4 (Open Multilingual Wordnet)
+
+# Installation instructions:
+# 1. Create a virtual environment: python -m venv venv
+# 2. Activate it: 
+#    - Windows: venv\Scripts\activate
+#    - macOS/Linux: source venv/bin/activate
+# 3. Install requirements: pip install -r requirements.txt
+# 4. Run setup: python run_pipeline.py --build_index
