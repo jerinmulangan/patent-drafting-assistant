@@ -29,9 +29,25 @@ def clean_text(text):
     # strip and collapse whitespace
     if not text:
         return ""
-    text = re.sub(r"<[^>]+>", " ", text)  
-    text = re.sub(r"\s+", " ", text)     
-    return text.lower().strip()
+    
+    # Memory-efficient processing for very large texts
+    if len(text) > 1000000:  # 1MB threshold
+        # Process in chunks to avoid memory issues
+        chunks = []
+        chunk_size = 100000  # 100KB chunks
+        for i in range(0, len(text), chunk_size):
+            chunk = text[i:i + chunk_size]
+            chunk = re.sub(r"<[^>]+>", " ", chunk)
+            chunk = re.sub(r"\s+", " ", chunk)
+            chunks.append(chunk.lower())
+        text = "".join(chunks)
+    else:
+        # Normal processing for smaller texts
+        text = re.sub(r"<[^>]+>", " ", text)  
+        text = re.sub(r"\s+", " ", text)     
+        text = text.lower()
+    
+    return text.strip()
 
 def tokenize_and_filter(text):
     tokens = word_tokenize(text)
