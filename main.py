@@ -5,7 +5,15 @@ FastAPI main application for Patent NLP Project.
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api_endpoints import router
+from api_endpoints import router, setup_validation_error_handler
+
+# Warm up caches for better performance
+try:
+    from optimized_search_service import warm_up_caches
+    print("Warming up search caches...")
+    warm_up_caches()
+except ImportError:
+    print("Optimized search service not available, using standard search")
 
 # Create FastAPI app
 app = FastAPI(
@@ -24,6 +32,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Setup validation error handler
+setup_validation_error_handler(app)
 
 # Include API routes
 app.include_router(router, prefix="/api/v1", tags=["patent-search"])

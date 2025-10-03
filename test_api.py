@@ -116,7 +116,7 @@ def test_compare_modes():
 
 def test_summarize():
     """Test summarize endpoint."""
-    print("\n🔍 Testing summarize endpoint...")
+    print("\nTesting summarize endpoint...")
     try:
         payload = {
             "doc_id": "USD1092964S1"

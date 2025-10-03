@@ -4,8 +4,9 @@ FastAPI endpoints for Patent NLP Project.
 Enhanced API that uses the centralized search service.
 """
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from pydantic import BaseModel, validator, ValidationError
 from typing import List, Dict, Any, Optional
 import json
 import os
@@ -29,11 +30,52 @@ class SearchRequestModel(BaseModel):
     include_snippets: bool = True
     include_metadata: bool = True
     log_enabled: bool = False
+    
+    @validator('query')
+    def validate_query(cls, v):
+        if not v or not v.strip():
+            raise ValueError('Query cannot be empty')
+        return v.strip()
+    
+    @validator('mode')
+    def validate_mode(cls, v):
+        valid_modes = ["tfidf", "semantic", "hybrid", "hybrid-advanced"]
+        if v not in valid_modes:
+            raise ValueError(f'Mode must be one of {valid_modes}')
+        return v
+    
+    @validator('top_k')
+    def validate_top_k(cls, v):
+        if v <= 0:
+            raise ValueError('top_k must be positive')
+        if v > 100:
+            raise ValueError('top_k cannot exceed 100')
+        return v
+    
+    @validator('alpha')
+    def validate_alpha(cls, v):
+        if v < 0 or v > 1:
+            raise ValueError('alpha must be between 0 and 1')
+        return v
 
 
 class SummarizeRequestModel(BaseModel):
     doc_id: str
     max_length: int = 200
+    
+    @validator('doc_id')
+    def validate_doc_id(cls, v):
+        if not v or not v.strip():
+            raise ValueError('Document ID cannot be empty')
+        return v.strip()
+    
+    @validator('max_length')
+    def validate_max_length(cls, v):
+        if v <= 0:
+            raise ValueError('max_length must be positive')
+        if v > 2000:
+            raise ValueError('max_length cannot exceed 2000')
+        return v
 
 
 class BatchSearchRequestModel(BaseModel):
@@ -47,6 +89,30 @@ class BatchSearchRequestModel(BaseModel):
     include_snippets: bool = True
     include_metadata: bool = True
     log_enabled: bool = False
+    
+    @validator('queries')
+    def validate_queries(cls, v):
+        if not v:
+            raise ValueError('Queries list cannot be empty')
+        for i, query in enumerate(v):
+            if not query or not query.strip():
+                raise ValueError(f'Query at index {i} cannot be empty')
+        return [q.strip() for q in v]
+    
+    @validator('mode')
+    def validate_mode(cls, v):
+        valid_modes = ["tfidf", "semantic", "hybrid", "hybrid-advanced"]
+        if v not in valid_modes:
+            raise ValueError(f'Mode must be one of {valid_modes}')
+        return v
+    
+    @validator('top_k')
+    def validate_top_k(cls, v):
+        if v <= 0:
+            raise ValueError('top_k must be positive')
+        if v > 100:
+            raise ValueError('top_k cannot exceed 100')
+        return v
 
 
 class CompareModesRequestModel(BaseModel):
@@ -66,9 +132,13 @@ async def search_endpoint(request: SearchRequestModel):
     Enhanced search endpoint with full feature support.
     """
     try:
+        # Validate query
+        if not request.query or not request.query.strip():
+            raise HTTPException(status_code=400, detail="Query cannot be empty")
+        
         # Create search request
         search_request = SearchRequest(
-            query=request.query,
+            query=request.query.strip(),
             mode=request.mode,
             top_k=request.top_k,
             alpha=request.alpha,
@@ -90,6 +160,14 @@ async def search_endpoint(request: SearchRequestModel):
         
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except ValidationError as e:
+        # Convert Pydantic validation errors to 400
+        error_messages = []
+        for error in e.errors():
+            field = " -> ".join(str(x) for x in error["loc"])
+            message = error["msg"]
+            error_messages.append(f"{field}: {message}")
+        raise HTTPException(status_code=400, detail="; ".join(error_messages))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
@@ -100,22 +178,42 @@ async def summarize_endpoint(request: SummarizeRequestModel):
     Enhanced summarization endpoint with snippet generation.
     """
     try:
-        # Load patent data
-        patent = load_patent_by_id(request.doc_id)
-        if patent is None:
-            raise HTTPException(status_code=404, detail="Patent not found")
+        # Handle both chunk IDs and document IDs
+        doc_id = request.doc_id
         
-        # Get description text
-        description = patent.get("description", "")
-        if not description:
+        # If it's a chunk ID, get the base document ID
+        if '_chunk' in doc_id:
+            base_doc_id = doc_id.split('_chunk')[0]
+        else:
+            base_doc_id = doc_id
+        
+        # Try to load patent data by base document ID
+        patent = load_patent_by_id(base_doc_id)
+        if patent is None:
+            raise HTTPException(status_code=404, detail=f"Patent not found: {base_doc_id}")
+        
+        # Get text content
+        text_content = ""
+        
+        # If it's a chunk ID, get chunk text
+        if '_chunk' in doc_id:
+            from search_utils import get_chunk_text
+            text_content = get_chunk_text(doc_id) or ""
+        
+        # If no chunk text, try to get description from patent
+        if not text_content:
+            text_content = patent.get("description", "") or patent.get("abstract", "")
+        
+        if not text_content:
             return {
                 "doc_id": request.doc_id,
-                "summary": "No description available",
-                "title": patent.get("title", "No title")
+                "summary": "No text content available for summarization",
+                "title": patent.get("title", "No title"),
+                "doc_type": patent.get("doc_type", "unknown")
             }
         
         # Generate smart snippet
-        summary = generate_snippet(description, "", max_length=request.max_length)
+        summary = generate_snippet(text_content, "", max_length=request.max_length)
         
         return {
             "doc_id": request.doc_id,
@@ -136,12 +234,20 @@ async def batch_search_endpoint(request: BatchSearchRequestModel):
     Batch search endpoint for multiple queries.
     """
     try:
+        # Validate queries
+        if not request.queries:
+            raise HTTPException(status_code=400, detail="Queries list cannot be empty")
+        
+        for i, query in enumerate(request.queries):
+            if not query or not query.strip():
+                raise HTTPException(status_code=400, detail=f"Query at index {i} cannot be empty")
+        
         results = []
         
         for query in request.queries:
             # Create search request for each query
             search_request = SearchRequest(
-                query=query,
+                query=query.strip(),
                 mode=request.mode,
                 top_k=request.top_k,
                 alpha=request.alpha,
@@ -166,6 +272,8 @@ async def batch_search_endpoint(request: BatchSearchRequestModel):
             "results": results
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Batch search failed: {str(e)}")
 
@@ -303,3 +411,25 @@ def _load_patent_from_file(doc_id: str, file_path: Path) -> Optional[Dict[str, A
         return None
     
     return None
+
+
+# Global exception handler for validation errors
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+
+def setup_validation_error_handler(app: FastAPI):
+    """Setup global exception handler to convert 422 to 400 for validation errors."""
+    
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(request: Request, exc: RequestValidationError):
+        # Convert Pydantic validation errors to 400 Bad Request
+        error_messages = []
+        for error in exc.errors():
+            field = " -> ".join(str(x) for x in error["loc"])
+            message = error["msg"]
+            error_messages.append(f"{field}: {message}")
+        
+        return JSONResponse(
+            status_code=400,
+            content={"detail": "; ".join(error_messages)}
+        )

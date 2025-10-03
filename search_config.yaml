@@ -1,0 +1,130 @@
+# Patent NLP Search Configuration
+# This file contains configurable parameters for search optimization
+
+# Default search configuration
+default:
+  mode: "hybrid"
+  alpha: 0.6
+  top_k: 10
+  rerank: true
+  tfidf_weight: 0.3
+  semantic_weight: 0.7
+  include_snippets: true
+  include_metadata: true
+  log_enabled: false
+
+# Mode-specific configurations
+modes:
+  tfidf:
+    top_k: 20
+    rerank: false
+    include_snippets: true
+    include_metadata: true
+    
+  semantic:
+    top_k: 15
+    rerank: true
+    tfidf_weight: 0.2
+    semantic_weight: 0.8
+    include_snippets: true
+    include_metadata: true
+    
+  hybrid:
+    alpha: 0.6
+    top_k: 10
+    rerank: true
+    tfidf_weight: 0.3
+    semantic_weight: 0.7
+    include_snippets: true
+    include_metadata: true
+    
+  hybrid-advanced:
+    top_k: 10
+    rerank: true
+    tfidf_weight: 0.3
+    semantic_weight: 0.7
+    include_snippets: true
+    include_metadata: true
+
+# Performance profiles
+profiles:
+  speed:
+    mode: "tfidf"
+    top_k: 5
+    rerank: false
+    include_snippets: false
+    include_metadata: false
+    
+  accuracy:
+    mode: "hybrid-advanced"
+    top_k: 20
+    rerank: true
+    tfidf_weight: 0.2
+    semantic_weight: 0.8
+    include_snippets: true
+    include_metadata: true
+    
+  balanced:
+    mode: "hybrid"
+    alpha: 0.6
+    top_k: 10
+    rerank: true
+    include_snippets: true
+    include_metadata: true
+
+# Query type-specific configurations
+query_types:
+  keyword_heavy:
+    mode: "tfidf"
+    top_k: 15
+    rerank: false
+    
+  conceptual:
+    mode: "semantic"
+    top_k: 15
+    rerank: true
+    tfidf_weight: 0.1
+    semantic_weight: 0.9
+    
+  mixed:
+    mode: "hybrid"
+    alpha: 0.5
+    top_k: 10
+    rerank: true
+
+# Re-ranking configuration
+reranking:
+  enabled: true
+  keyword_weight: 0.3
+  semantic_weight: 0.7
+  min_score_threshold: 0.1
+  max_candidates: 50
+
+# Snippet generation
+snippets:
+  max_length: 200
+  highlight_terms: true
+  context_window: 50
+
+# Logging configuration
+logging:
+  enabled: false
+  log_file: "query_log.jsonl"
+  log_level: "INFO"
+  include_timing: true
+  include_metadata: true
+
+# Performance thresholds
+performance:
+  max_search_time: 10.0  # seconds
+  max_memory_usage: 1024  # MB
+  cache_enabled: false
+  cache_ttl: 3600  # seconds
+
+# API configuration
+api:
+  default_mode: "hybrid"
+  max_top_k: 100
+  rate_limit: 100  # requests per minute
+  timeout: 30  # seconds
+

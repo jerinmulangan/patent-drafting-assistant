@@ -1,0 +1,824 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "created": "2024-09-28",
+    "description": "Patent NLP evaluation dataset with test queries and expected relevant patents",
+    "total_queries": 75,
+    "categories": ["machine_learning", "artificial_intelligence", "neural_networks", "data_processing", "computer_vision", "natural_language_processing", "robotics", "blockchain", "cybersecurity", "biotechnology"]
+  },
+  "queries": [
+    {
+      "id": "q001",
+      "query": "machine learning algorithm",
+      "category": "machine_learning",
+      "description": "Basic ML algorithm search",
+      "expected_patents": [
+        "US12417505B2",
+        "US20250292150A1",
+        "US20250292032A1"
+      ],
+      "relevance_scores": [1.0, 0.9, 0.8]
+    },
+    {
+      "id": "q002", 
+      "query": "neural network deep learning",
+      "category": "neural_networks",
+      "description": "Deep learning and neural networks",
+      "expected_patents": [
+        "US12417464B2",
+        "US12417260B2",
+        "US20250291599A1"
+      ],
+      "relevance_scores": [1.0, 0.9, 0.7]
+    },
+    {
+      "id": "q003",
+      "query": "artificial intelligence system",
+      "category": "artificial_intelligence", 
+      "description": "General AI systems",
+      "expected_patents": [
+        "US20250291623A1",
+        "US12417407B2",
+        "US20250292483A1"
+      ],
+      "relevance_scores": [1.0, 0.8, 0.6]
+    },
+    {
+      "id": "q004",
+      "query": "computer vision image recognition",
+      "category": "computer_vision",
+      "description": "Image processing and computer vision",
+      "expected_patents": [
+        "US20250292483A1",
+        "US12417464B2"
+      ],
+      "relevance_scores": [1.0, 0.8]
+    },
+    {
+      "id": "q005",
+      "query": "natural language processing text analysis",
+      "category": "natural_language_processing",
+      "description": "NLP and text processing",
+      "expected_patents": [
+        "US20250291623A1",
+        "US12417505B2"
+      ],
+      "relevance_scores": [1.0, 0.7]
+    },
+    {
+      "id": "q006",
+      "query": "data processing analytics",
+      "category": "data_processing",
+      "description": "Data processing and analytics",
+      "expected_patents": [
+        "US20250291623A1",
+        "US12417505B2",
+        "US20250292150A1"
+      ],
+      "relevance_scores": [1.0, 0.8, 0.6]
+    },
+    {
+      "id": "q007",
+      "query": "robotic automation system",
+      "category": "robotics",
+      "description": "Robotics and automation",
+      "expected_patents": [
+        "US12417181B1",
+        "US20250292032A1"
+      ],
+      "relevance_scores": [1.0, 0.6]
+    },
+    {
+      "id": "q008",
+      "query": "blockchain distributed ledger",
+      "category": "blockchain",
+      "description": "Blockchain technology",
+      "expected_patents": [
+        "US20250292150A1"
+      ],
+      "relevance_scores": [1.0]
+    },
+    {
+      "id": "q009",
+      "query": "cybersecurity threat detection",
+      "category": "cybersecurity",
+      "description": "Security and threat detection",
+      "expected_patents": [
+        "US12417505B2",
+        "US12417407B2"
+      ],
+      "relevance_scores": [1.0, 0.7]
+    },
+    {
+      "id": "q010",
+      "query": "biotechnology genetic engineering",
+      "category": "biotechnology",
+      "description": "Biotech and genetic engineering",
+      "expected_patents": [
+        "US12417260B2"
+      ],
+      "relevance_scores": [1.0]
+    },
+    {
+      "id": "q011",
+      "query": "reinforcement learning agent",
+      "category": "machine_learning",
+      "description": "Reinforcement learning",
+      "expected_patents": [
+        "US12417464B2",
+        "US20250291599A1"
+      ],
+      "relevance_scores": [1.0, 0.8]
+    },
+    {
+      "id": "q012",
+      "query": "convolutional neural network CNN",
+      "category": "neural_networks",
+      "description": "CNN architectures",
+      "expected_patents": [
+        "US12417464B2",
+        "US20250292483A1"
+      ],
+      "relevance_scores": [1.0, 0.9]
+    },
+    {
+      "id": "q013",
+      "query": "transformer attention mechanism",
+      "category": "neural_networks",
+      "description": "Transformer models",
+      "expected_patents": [
+        "US20250291623A1",
+        "US12417464B2"
+      ],
+      "relevance_scores": [1.0, 0.8]
+    },
+    {
+      "id": "q014",
+      "query": "federated learning distributed training",
+      "category": "machine_learning",
+      "description": "Federated learning",
+      "expected_patents": [
+        "US20250292150A1",
+        "US12417464B2"
+      ],
+      "relevance_scores": [1.0, 0.7]
+    },
+    {
+      "id": "q015",
+      "query": "object detection computer vision",
+      "category": "computer_vision",
+      "description": "Object detection systems",
+      "expected_patents": [
+        "US20250292483A1",
+        "US12417464B2"
+      ],
+      "relevance_scores": [1.0, 0.8]
+    },
+    {
+      "id": "q016",
+      "query": "sentiment analysis text mining",
+      "category": "natural_language_processing",
+      "description": "Sentiment analysis",
+      "expected_patents": [
+        "US20250291623A1",
+        "US12417505B2"
+      ],
+      "relevance_scores": [1.0, 0.6]
+    },
+    {
+      "id": "q017",
+      "query": "real-time data streaming",
+      "category": "data_processing",
+      "description": "Real-time data processing",
+      "expected_patents": [
+        "US20250291623A1",
+        "US12417505B2"
+      ],
+      "relevance_scores": [1.0, 0.7]
+    },
+    {
+      "id": "q018",
+      "query": "autonomous vehicle navigation",
+      "category": "robotics",
+      "description": "Autonomous vehicles",
+      "expected_patents": [
+        "US12417181B1",
+        "US20250292032A1"
+      ],
+      "relevance_scores": [1.0, 0.5]
+    },
+    {
+      "id": "q019",
+      "query": "smart contract blockchain",
+      "category": "blockchain",
+      "description": "Smart contracts",
+      "expected_patents": [
+        "US20250292150A1"
+      ],
+      "relevance_scores": [1.0]
+    },
+    {
+      "id": "q020",
+      "query": "encryption security protocol",
+      "category": "cybersecurity",
+      "description": "Encryption and security",
+      "expected_patents": [
+        "US12417505B2",
+        "US12417407B2"
+      ],
+      "relevance_scores": [1.0, 0.8]
+    },
+    {
+      "id": "q021",
+      "query": "gene editing CRISPR",
+      "category": "biotechnology",
+      "description": "Gene editing technology",
+      "expected_patents": [
+        "US12417260B2"
+      ],
+      "relevance_scores": [1.0]
+    },
+    {
+      "id": "q022",
+      "query": "gradient boosting ensemble learning",
+      "category": "machine_learning",
+      "description": "Ensemble methods",
+      "expected_patents": [
+        "US12417505B2",
+        "US20250292150A1"
+      ],
+      "relevance_scores": [1.0, 0.7]
+    },
+    {
+      "id": "q023",
+      "query": "recurrent neural network RNN LSTM",
+      "category": "neural_networks",
+      "description": "RNN and LSTM networks",
+      "expected_patents": [
+        "US12417464B2",
+        "US20250291623A1"
+      ],
+      "relevance_scores": [1.0, 0.8]
+    },
+    {
+      "id": "q024",
+      "query": "BERT language model",
+      "category": "natural_language_processing",
+      "description": "BERT and language models",
+      "expected_patents": [
+        "US20250291623A1",
+        "US12417464B2"
+      ],
+      "relevance_scores": [1.0, 0.7]
+    },
+    {
+      "id": "q025",
+      "query": "edge computing IoT",
+      "category": "data_processing",
+      "description": "Edge computing and IoT",
+      "expected_patents": [
+        "US20250291623A1",
+        "US12417505B2"
+      ],
+      "relevance_scores": [1.0, 0.6]
+    },
+    {
+      "id": "q026",
+      "query": "industrial robot automation",
+      "category": "robotics",
+      "description": "Industrial robotics",
+      "expected_patents": [
+        "US12417181B1",
+        "US20250292032A1"
+      ],
+      "relevance_scores": [1.0, 0.8]
+    },
+    {
+      "id": "q027",
+      "query": "cryptocurrency mining",
+      "category": "blockchain",
+      "description": "Cryptocurrency and mining",
+      "expected_patents": [
+        "US20250292150A1"
+      ],
+      "relevance_scores": [1.0]
+    },
+    {
+      "id": "q028",
+      "query": "intrusion detection system",
+      "category": "cybersecurity",
+      "description": "Intrusion detection",
+      "expected_patents": [
+        "US12417505B2",
+        "US12417407B2"
+      ],
+      "relevance_scores": [1.0, 0.9]
+    },
+    {
+      "id": "q029",
+      "query": "protein folding prediction",
+      "category": "biotechnology",
+      "description": "Protein structure prediction",
+      "expected_patents": [
+        "US12417260B2"
+      ],
+      "relevance_scores": [1.0]
+    },
+    {
+      "id": "q030",
+      "query": "support vector machine SVM",
+      "category": "machine_learning",
+      "description": "SVM classification",
+      "expected_patents": [
+        "US12417505B2",
+        "US20250292150A1"
+      ],
+      "relevance_scores": [1.0, 0.6]
+    },
+    {
+      "id": "q031",
+      "query": "generative adversarial network GAN",
+      "category": "neural_networks",
+      "description": "GAN architectures",
+      "expected_patents": [
+        "US12417464B2",
+        "US20250292483A1"
+      ],
+      "relevance_scores": [1.0, 0.7]
+    },
+    {
+      "id": "q032",
+      "query": "question answering system",
+      "category": "natural_language_processing",
+      "description": "QA systems",
+      "expected_patents": [
+        "US20250291623A1",
+        "US12417464B2"
+      ],
+      "relevance_scores": [1.0, 0.8]
+    },
+    {
+      "id": "q033",
+      "query": "big data analytics platform",
+      "category": "data_processing",
+      "description": "Big data platforms",
+      "expected_patents": [
+        "US20250291623A1",
+        "US12417505B2"
+      ],
+      "relevance_scores": [1.0, 0.8]
+    },
+    {
+      "id": "q034",
+      "query": "humanoid robot control",
+      "category": "robotics",
+      "description": "Humanoid robotics",
+      "expected_patents": [
+        "US12417181B1",
+        "US20250292032A1"
+      ],
+      "relevance_scores": [1.0, 0.7]
+    },
+    {
+      "id": "q035",
+      "query": "decentralized application dApp",
+      "category": "blockchain",
+      "description": "Decentralized applications",
+      "expected_patents": [
+        "US20250292150A1"
+      ],
+      "relevance_scores": [1.0]
+    },
+    {
+      "id": "q036",
+      "query": "zero trust security model",
+      "category": "cybersecurity",
+      "description": "Zero trust security",
+      "expected_patents": [
+        "US12417505B2",
+        "US12417407B2"
+      ],
+      "relevance_scores": [1.0, 0.8]
+    },
+    {
+      "id": "q037",
+      "query": "synthetic biology engineering",
+      "category": "biotechnology",
+      "description": "Synthetic biology",
+      "expected_patents": [
+        "US12417260B2"
+      ],
+      "relevance_scores": [1.0]
+    },
+    {
+      "id": "q038",
+      "query": "random forest classifier",
+      "category": "machine_learning",
+      "description": "Random forest algorithms",
+      "expected_patents": [
+        "US12417505B2",
+        "US20250292150A1"
+      ],
+      "relevance_scores": [1.0, 0.8]
+    },
+    {
+      "id": "q039",
+      "query": "attention mechanism transformer",
+      "category": "neural_networks",
+      "description": "Attention mechanisms",
+      "expected_patents": [
+        "US20250291623A1",
+        "US12417464B2"
+      ],
+      "relevance_scores": [1.0, 0.9]
+    },
+    {
+      "id": "q040",
+      "query": "machine translation system",
+      "category": "natural_language_processing",
+      "description": "Machine translation",
+      "expected_patents": [
+        "US20250291623A1",
+        "US12417464B2"
+      ],
+      "relevance_scores": [1.0, 0.7]
+    },
+    {
+      "id": "q041",
+      "query": "stream processing real-time",
+      "category": "data_processing",
+      "description": "Stream processing",
+      "expected_patents": [
+        "US20250291623A1",
+        "US12417505B2"
+      ],
+      "relevance_scores": [1.0, 0.8]
+    },
+    {
+      "id": "q042",
+      "query": "swarm robotics coordination",
+      "category": "robotics",
+      "description": "Swarm robotics",
+      "expected_patents": [
+        "US12417181B1",
+        "US20250292032A1"
+      ],
+      "relevance_scores": [1.0, 0.6]
+    },
+    {
+      "id": "q043",
+      "query": "consensus algorithm blockchain",
+      "category": "blockchain",
+      "description": "Consensus mechanisms",
+      "expected_patents": [
+        "US20250292150A1"
+      ],
+      "relevance_scores": [1.0]
+    },
+    {
+      "id": "q044",
+      "query": "malware detection analysis",
+      "category": "cybersecurity",
+      "description": "Malware detection",
+      "expected_patents": [
+        "US12417505B2",
+        "US12417407B2"
+      ],
+      "relevance_scores": [1.0, 0.9]
+    },
+    {
+      "id": "q045",
+      "query": "drug discovery AI",
+      "category": "biotechnology",
+      "description": "AI for drug discovery",
+      "expected_patents": [
+        "US12417260B2"
+      ],
+      "relevance_scores": [1.0]
+    },
+    {
+      "id": "q046",
+      "query": "clustering algorithm unsupervised",
+      "category": "machine_learning",
+      "description": "Clustering methods",
+      "expected_patents": [
+        "US12417505B2",
+        "US20250292150A1"
+      ],
+      "relevance_scores": [1.0, 0.7]
+    },
+    {
+      "id": "q047",
+      "query": "graph neural network GNN",
+      "category": "neural_networks",
+      "description": "Graph neural networks",
+      "expected_patents": [
+        "US12417464B2",
+        "US20250291623A1"
+      ],
+      "relevance_scores": [1.0, 0.8]
+    },
+    {
+      "id": "q048",
+      "query": "named entity recognition NER",
+      "category": "natural_language_processing",
+      "description": "NER systems",
+      "expected_patents": [
+        "US20250291623A1",
+        "US12417464B2"
+      ],
+      "relevance_scores": [1.0, 0.7]
+    },
+    {
+      "id": "q049",
+      "query": "data warehouse ETL",
+      "category": "data_processing",
+      "description": "Data warehousing",
+      "expected_patents": [
+        "US20250291623A1",
+        "US12417505B2"
+      ],
+      "relevance_scores": [1.0, 0.6]
+    },
+    {
+      "id": "q050",
+      "query": "collaborative robot cobot",
+      "category": "robotics",
+      "description": "Collaborative robotics",
+      "expected_patents": [
+        "US12417181B1",
+        "US20250292032A1"
+      ],
+      "relevance_scores": [1.0, 0.8]
+    },
+    {
+      "id": "q051",
+      "query": "non-fungible token NFT",
+      "category": "blockchain",
+      "description": "NFT technology",
+      "expected_patents": [
+        "US20250292150A1"
+      ],
+      "relevance_scores": [1.0]
+    },
+    {
+      "id": "q052",
+      "query": "penetration testing security",
+      "category": "cybersecurity",
+      "description": "Penetration testing",
+      "expected_patents": [
+        "US12417505B2",
+        "US12417407B2"
+      ],
+      "relevance_scores": [1.0, 0.7]
+    },
+    {
+      "id": "q053",
+      "query": "precision medicine genomics",
+      "category": "biotechnology",
+      "description": "Precision medicine",
+      "expected_patents": [
+        "US12417260B2"
+      ],
+      "relevance_scores": [1.0]
+    },
+    {
+      "id": "q054",
+      "query": "dimensionality reduction PCA",
+      "category": "machine_learning",
+      "description": "Dimensionality reduction",
+      "expected_patents": [
+        "US12417505B2",
+        "US20250292150A1"
+      ],
+      "relevance_scores": [1.0, 0.6]
+    },
+    {
+      "id": "q055",
+      "query": "variational autoencoder VAE",
+      "category": "neural_networks",
+      "description": "Variational autoencoders",
+      "expected_patents": [
+        "US12417464B2",
+        "US20250292483A1"
+      ],
+      "relevance_scores": [1.0, 0.7]
+    },
+    {
+      "id": "q056",
+      "query": "text summarization abstractive",
+      "category": "natural_language_processing",
+      "description": "Text summarization",
+      "expected_patents": [
+        "US20250291623A1",
+        "US12417464B2"
+      ],
+      "relevance_scores": [1.0, 0.8]
+    },
+    {
+      "id": "q057",
+      "query": "data lake architecture",
+      "category": "data_processing",
+      "description": "Data lake systems",
+      "expected_patents": [
+        "US20250291623A1",
+        "US12417505B2"
+      ],
+      "relevance_scores": [1.0, 0.7]
+    },
+    {
+      "id": "q058",
+      "query": "mobile robot navigation",
+      "category": "robotics",
+      "description": "Mobile robot navigation",
+      "expected_patents": [
+        "US12417181B1",
+        "US20250292032A1"
+      ],
+      "relevance_scores": [1.0, 0.9]
+    },
+    {
+      "id": "q059",
+      "query": "DeFi decentralized finance",
+      "category": "blockchain",
+      "description": "Decentralized finance",
+      "expected_patents": [
+        "US20250292150A1"
+      ],
+      "relevance_scores": [1.0]
+    },
+    {
+      "id": "q060",
+      "query": "vulnerability assessment security",
+      "category": "cybersecurity",
+      "description": "Vulnerability assessment",
+      "expected_patents": [
+        "US12417505B2",
+        "US12417407B2"
+      ],
+      "relevance_scores": [1.0, 0.8]
+    },
+    {
+      "id": "q061",
+      "query": "stem cell therapy regenerative",
+      "category": "biotechnology",
+      "description": "Stem cell therapy",
+      "expected_patents": [
+        "US12417260B2"
+      ],
+      "relevance_scores": [1.0]
+    },
+    {
+      "id": "q062",
+      "query": "feature selection algorithm",
+      "category": "machine_learning",
+      "description": "Feature selection",
+      "expected_patents": [
+        "US12417505B2",
+        "US20250292150A1"
+      ],
+      "relevance_scores": [1.0, 0.7]
+    },
+    {
+      "id": "q063",
+      "query": "residual network ResNet",
+      "category": "neural_networks",
+      "description": "ResNet architectures",
+      "expected_patents": [
+        "US12417464B2",
+        "US20250292483A1"
+      ],
+      "relevance_scores": [1.0, 0.8]
+    },
+    {
+      "id": "q064",
+      "query": "dialogue system chatbot",
+      "category": "natural_language_processing",
+      "description": "Dialogue systems",
+      "expected_patents": [
+        "US20250291623A1",
+        "US12417464B2"
+      ],
+      "relevance_scores": [1.0, 0.7]
+    },
+    {
+      "id": "q065",
+      "query": "data pipeline ETL",
+      "category": "data_processing",
+      "description": "Data pipelines",
+      "expected_patents": [
+        "US20250291623A1",
+        "US12417505B2"
+      ],
+      "relevance_scores": [1.0, 0.8]
+    },
+    {
+      "id": "q066",
+      "query": "service robot assistance",
+      "category": "robotics",
+      "description": "Service robotics",
+      "expected_patents": [
+        "US12417181B1",
+        "US20250292032A1"
+      ],
+      "relevance_scores": [1.0, 0.7]
+    },
+    {
+      "id": "q067",
+      "query": "cross-chain interoperability",
+      "category": "blockchain",
+      "description": "Cross-chain technology",
+      "expected_patents": [
+        "US20250292150A1"
+      ],
+      "relevance_scores": [1.0]
+    },
+    {
+      "id": "q068",
+      "query": "identity authentication biometric",
+      "category": "cybersecurity",
+      "description": "Biometric authentication",
+      "expected_patents": [
+        "US12417505B2",
+        "US12417407B2"
+      ],
+      "relevance_scores": [1.0, 0.8]
+    },
+    {
+      "id": "q069",
+      "query": "tissue engineering scaffold",
+      "category": "biotechnology",
+      "description": "Tissue engineering",
+      "expected_patents": [
+        "US12417260B2"
+      ],
+      "relevance_scores": [1.0]
+    },
+    {
+      "id": "q070",
+      "query": "hyperparameter optimization tuning",
+      "category": "machine_learning",
+      "description": "Hyperparameter optimization",
+      "expected_patents": [
+        "US12417505B2",
+        "US20250292150A1"
+      ],
+      "relevance_scores": [1.0, 0.8]
+    },
+    {
+      "id": "q071",
+      "query": "U-Net segmentation network",
+      "category": "neural_networks",
+      "description": "U-Net architectures",
+      "expected_patents": [
+        "US12417464B2",
+        "US20250292483A1"
+      ],
+      "relevance_scores": [1.0, 0.7]
+    },
+    {
+      "id": "q072",
+      "query": "information extraction NLP",
+      "category": "natural_language_processing",
+      "description": "Information extraction",
+      "expected_patents": [
+        "US20250291623A1",
+        "US12417464B2"
+      ],
+      "relevance_scores": [1.0, 0.8]
+    },
+    {
+      "id": "q073",
+      "query": "data governance compliance",
+      "category": "data_processing",
+      "description": "Data governance",
+      "expected_patents": [
+        "US20250291623A1",
+        "US12417505B2"
+      ],
+      "relevance_scores": [1.0, 0.6]
+    },
+    {
+      "id": "q074",
+      "query": "exoskeleton robotic assistance",
+      "category": "robotics",
+      "description": "Exoskeleton robotics",
+      "expected_patents": [
+        "US12417181B1",
+        "US20250292032A1"
+      ],
+      "relevance_scores": [1.0, 0.6]
+    },
+    {
+      "id": "q075",
+      "query": "layer 2 scaling solution",
+      "category": "blockchain",
+      "description": "Layer 2 scaling",
+      "expected_patents": [
+        "US20250292150A1"
+      ],
+      "relevance_scores": [1.0]
+    }
+  ]
+}
+

@@ -14,6 +14,19 @@ from embed_semantic import search_semantic
 from embed_hybrid import search_hybrid, search_hybrid_advanced
 from search_utils import generate_snippet, log_query, load_patent_metadata
 
+# Import optimized search functions
+try:
+    from optimized_search_service import (
+        optimized_tfidf_search_with_metadata,
+        optimized_semantic_search,
+        optimized_hybrid_search,
+        optimized_hybrid_advanced_search,
+        warm_up_caches
+    )
+    OPTIMIZED_AVAILABLE = True
+except ImportError:
+    OPTIMIZED_AVAILABLE = False
+
 
 class SearchRequest:
     """Search request parameters."""
@@ -85,41 +98,86 @@ def run_search(request: SearchRequest) -> Tuple[List[SearchResult], Dict[str, An
     """
     start_time = time.time()
     
+    # Validate query
+    if not request.query or not request.query.strip():
+        raise ValueError("Query cannot be empty")
+    
+    # Validate top_k
+    if request.top_k <= 0:
+        raise ValueError("top_k must be positive")
+    
+    if request.top_k > 100:
+        raise ValueError("top_k cannot exceed 100")
+    
     # Validate mode
     valid_modes = ["tfidf", "semantic", "hybrid", "hybrid-advanced"]
     if request.mode not in valid_modes:
         raise ValueError(f"Invalid search mode: {request.mode}. Must be one of {valid_modes}")
     
-    # Run search based on mode
+    # Validate alpha for hybrid mode
+    if request.mode == "hybrid" and (request.alpha < 0 or request.alpha > 1):
+        raise ValueError("alpha must be between 0 and 1 for hybrid mode")
+    
+    # Run search based on mode (use optimized versions if available)
     if request.mode == "tfidf":
-        raw_results = search_tfidf_with_metadata(request.query, top_k=request.top_k)
+        if OPTIMIZED_AVAILABLE:
+            raw_results = optimized_tfidf_search_with_metadata(request.query, top_k=request.top_k)
+        else:
+            raw_results = search_tfidf_with_metadata(request.query, top_k=request.top_k)
         
     elif request.mode == "semantic":
-        raw_results = search_semantic(
-            request.query, 
-            top_k=request.top_k, 
-            rerank=request.rerank,
-            keyword_weight=request.tfidf_weight,
-            semantic_weight=request.semantic_weight
-        )
+        if OPTIMIZED_AVAILABLE:
+            raw_results = optimized_semantic_search(
+                request.query, 
+                top_k=request.top_k, 
+                rerank=request.rerank,
+                keyword_weight=request.tfidf_weight,
+                semantic_weight=request.semantic_weight
+            )
+        else:
+            raw_results = search_semantic(
+                request.query, 
+                top_k=request.top_k, 
+                rerank=request.rerank,
+                keyword_weight=request.tfidf_weight,
+                semantic_weight=request.semantic_weight
+            )
         
     elif request.mode == "hybrid":
-        raw_results = search_hybrid(
-            request.query,
-            top_k=request.top_k,
-            alpha=request.alpha,
-            rerank=request.rerank,
-            keyword_weight=request.tfidf_weight,
-            semantic_weight=request.semantic_weight
-        )
+        if OPTIMIZED_AVAILABLE:
+            raw_results = optimized_hybrid_search(
+                request.query,
+                top_k=request.top_k,
+                alpha=request.alpha,
+                rerank=request.rerank,
+                keyword_weight=request.tfidf_weight,
+                semantic_weight=request.semantic_weight
+            )
+        else:
+            raw_results = search_hybrid(
+                request.query,
+                top_k=request.top_k,
+                alpha=request.alpha,
+                rerank=request.rerank,
+                keyword_weight=request.tfidf_weight,
+                semantic_weight=request.semantic_weight
+            )
         
     elif request.mode == "hybrid-advanced":
-        raw_results = search_hybrid_advanced(
-            request.query,
-            top_k=request.top_k,
-            tfidf_weight=request.tfidf_weight,
-            semantic_weight=request.semantic_weight
-        )
+        if OPTIMIZED_AVAILABLE:
+            raw_results = optimized_hybrid_advanced_search(
+                request.query,
+                top_k=request.top_k,
+                tfidf_weight=request.tfidf_weight,
+                semantic_weight=request.semantic_weight
+            )
+        else:
+            raw_results = search_hybrid_advanced(
+                request.query,
+                top_k=request.top_k,
+                tfidf_weight=request.tfidf_weight,
+                semantic_weight=request.semantic_weight
+            )
     
     # Convert raw results to standardized format
     results = []
@@ -259,4 +317,4 @@ if __name__ == "__main__":
     for result in results[:2]:
         print(f"  - {result.doc_id}: {result.score:.4f}")
     
-    print("\n✅ Search service test completed!")
+    print("\nSearch service test completed!")

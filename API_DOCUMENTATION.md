@@ -30,7 +30,7 @@ python test_api.py
 
 ## API Endpoints
 
-### 🔍 Search Endpoint
+### Search Endpoint
 
 **POST** `/api/v1/search`
 
@@ -104,7 +104,7 @@ curl -X POST "http://127.0.0.1:8000/api/v1/search" \
   -d '{"query": "artificial intelligence", "mode": "hybrid", "rerank": true, "alpha": 0.7}'
 ```
 
-### 📄 Summarization Endpoint
+### Summarization Endpoint
 
 **POST** `/api/v1/summarize`
 
@@ -137,7 +137,7 @@ Generate intelligent summaries of patent documents.
 }
 ```
 
-### 🔄 Batch Search Endpoint
+### Batch Search Endpoint
 
 **POST** `/api/v1/batch_search`
 
@@ -172,7 +172,7 @@ Process multiple queries in a single request.
 }
 ```
 
-### ⚖️ Mode Comparison Endpoint
+### Mode Comparison Endpoint
 
 **POST** `/api/v1/compare_modes`
 
@@ -214,7 +214,7 @@ Compare search results across all available modes.
 }
 ```
 
-### 📊 Log Analysis Endpoint
+### Log Analysis Endpoint
 
 **GET** `/api/v1/logs/analyze`
 
@@ -246,7 +246,7 @@ Analyze query logs and return usage statistics.
 }
 ```
 
-### ❤️ Health Check Endpoint
+### Health Check Endpoint
 
 **GET** `/api/v1/health`
 
