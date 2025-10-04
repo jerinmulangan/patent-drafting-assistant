@@ -1,53 +1,31 @@
-# Patent NLP Project - Complete Requirements
-# Install with: pip install -r requirements.txt
+# === Core scientific stack ===
+numpy==1.26.4
+pandas==2.2.2
+scikit-learn==1.7.2
+pyarrow==17.0.0
 
-# Core Python packages (usually included with Python)
-# argparse - built-in
-# json - built-in  
-# os - built-in
-# re - built-in
-# sys - built-in
-# time - built-in
-# pathlib - built-in (Python 3.4+)
-# collections - built-in
-# csv - built-in
-# subprocess - built-in
-# xml.etree.ElementTree - built-in
-# pickle - built-in
+# === NLP stack ===
+nltk==3.9.1
+sentence-transformers==2.7.0
+transformers==4.45.2
+torch==2.3.1
+faiss-cpu==1.8.0.post1
 
-# Scientific computing and data processing
-numpy>=1.21.0
-scikit-learn>=1.0.0
+# === Web + API framework ===
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+starlette==0.38.5
+pydantic==2.9.2
+python-multipart==0.0.12
+anyio==4.4.0
+typing_extensions==4.12.2
 
-# Natural language processing
-nltk>=3.7
-sentence-transformers>=2.2.0
+# === Database support ===
+SQLAlchemy==2.0.35
+psycopg2-binary==2.9.9
+pymongo==4.9.1
 
-# Vector similarity search
-faiss-cpu>=1.7.0
-
-# Web API framework
-fastapi>=0.104.0
-uvicorn[standard]>=0.24.0
-
-# Optional: For better performance (if you have CUDA)
-# faiss-gpu>=1.7.0  # Uncomment if you have CUDA and want GPU acceleration
-
-# Development and testing (optional)
-# pytest>=6.0.0  # Uncomment if you want to run tests
-# jupyter>=1.0.0  # Uncomment if you want to use Jupyter notebooks
-
-# Note: The following packages are downloaded automatically by NLTK:
-# - punkt (tokenizer)
-# - punkt_tab (tokenizer)  
-# - stopwords (stop word lists)
-# - wordnet (lemmatizer)
-# - omw-1.4 (Open Multilingual Wordnet)
-
-# Installation instructions:
-# 1. Create a virtual environment: python -m venv venv
-# 2. Activate it: 
-#    - Windows: venv\Scripts\activate
-#    - macOS/Linux: source venv/bin/activate
-# 3. Install requirements: pip install -r requirements.txt
-# 4. Run setup: python run_pipeline.py --build_index
+# === HTTP / Networking ===
+requests==2.32.3
+dnspython==2.6.1
+tenacity==9.0.0

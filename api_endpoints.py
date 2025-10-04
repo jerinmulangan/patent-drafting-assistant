@@ -6,7 +6,7 @@ Enhanced API that uses the centralized search service.
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from pydantic import BaseModel, validator, ValidationError
+from pydantic import BaseModel, ValidationError, field_validator
 from typing import List, Dict, Any, Optional
 import json
 import os
@@ -31,20 +31,20 @@ class SearchRequestModel(BaseModel):
     include_metadata: bool = True
     log_enabled: bool = False
     
-    @validator('query')
+    @field_validator('query')
     def validate_query(cls, v):
         if not v or not v.strip():
             raise ValueError('Query cannot be empty')
         return v.strip()
     
-    @validator('mode')
+    @field_validator('mode')
     def validate_mode(cls, v):
         valid_modes = ["tfidf", "semantic", "hybrid", "hybrid-advanced"]
         if v not in valid_modes:
             raise ValueError(f'Mode must be one of {valid_modes}')
         return v
     
-    @validator('top_k')
+    @field_validator('top_k')
     def validate_top_k(cls, v):
         if v <= 0:
             raise ValueError('top_k must be positive')
@@ -52,7 +52,7 @@ class SearchRequestModel(BaseModel):
             raise ValueError('top_k cannot exceed 100')
         return v
     
-    @validator('alpha')
+    @field_validator('alpha')
     def validate_alpha(cls, v):
         if v < 0 or v > 1:
             raise ValueError('alpha must be between 0 and 1')
@@ -63,13 +63,13 @@ class SummarizeRequestModel(BaseModel):
     doc_id: str
     max_length: int = 200
     
-    @validator('doc_id')
+    @field_validator('doc_id')
     def validate_doc_id(cls, v):
         if not v or not v.strip():
             raise ValueError('Document ID cannot be empty')
         return v.strip()
     
-    @validator('max_length')
+    @field_validator('max_length')
     def validate_max_length(cls, v):
         if v <= 0:
             raise ValueError('max_length must be positive')
@@ -90,7 +90,7 @@ class BatchSearchRequestModel(BaseModel):
     include_metadata: bool = True
     log_enabled: bool = False
     
-    @validator('queries')
+    @field_validator('queries')
     def validate_queries(cls, v):
         if not v:
             raise ValueError('Queries list cannot be empty')
@@ -99,14 +99,14 @@ class BatchSearchRequestModel(BaseModel):
                 raise ValueError(f'Query at index {i} cannot be empty')
         return [q.strip() for q in v]
     
-    @validator('mode')
+    @field_validator('mode')
     def validate_mode(cls, v):
         valid_modes = ["tfidf", "semantic", "hybrid", "hybrid-advanced"]
         if v not in valid_modes:
             raise ValueError(f'Mode must be one of {valid_modes}')
         return v
     
-    @validator('top_k')
+    @field_validator('top_k')
     def validate_top_k(cls, v):
         if v <= 0:
             raise ValueError('top_k must be positive')

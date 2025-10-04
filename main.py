@@ -6,6 +6,8 @@ FastAPI main application for Patent NLP Project.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api_endpoints import router, setup_validation_error_handler
+from extra_endpoints import router as extra_router
+from db import sql_engine, Base
 
 # Warm up caches for better performance
 try:
@@ -14,6 +16,8 @@ try:
     warm_up_caches()
 except ImportError:
     print("Optimized search service not available, using standard search")
+
+Base.metadata.create_all(bind=sql_engine)
 
 # Create FastAPI app
 app = FastAPI(
@@ -38,6 +42,7 @@ setup_validation_error_handler(app)
 
 # Include API routes
 app.include_router(router, prefix="/api/v1", tags=["patent-search"])
+app.include_router(extra_router, prefix="/api/v1", tags=["extra-features"])
 
 # Root endpoint
 @app.get("/")
@@ -56,6 +61,6 @@ async def root():
         }
     }
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+# if __name__ == "__main__":
+#     import uvicorn
+#     uvicorn.run(app, host="0.0.0.0", port=8000)
