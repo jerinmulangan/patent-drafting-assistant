@@ -26,12 +26,21 @@ sentence-transformers>=2.2.0
 # Vector similarity search
 faiss-cpu>=1.7.0
 
+# Web API framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
 # Optional: For better performance (if you have CUDA)
 # faiss-gpu>=1.7.0  # Uncomment if you have CUDA and want GPU acceleration
 
 # Development and testing (optional)
 # pytest>=6.0.0  # Uncomment if you want to run tests
 # jupyter>=1.0.0  # Uncomment if you want to use Jupyter notebooks
+
+# Patent draft generation with Ollama
+ollama>=0.6.0
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
 
 # Note: The following packages are downloaded automatically by NLTK:
 # - punkt (tokenizer)
