@@ -6,6 +6,8 @@ Test script for Patent NLP API endpoints.
 import requests
 import json
 import time
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 API_BASE = "http://127.0.0.1:8000/api/v1"
 
@@ -136,6 +138,44 @@ def test_summarize():
         print(f"Summarize error: {e}")
         return False
 
+def create_session_with_retries():
+    """Create a requests session with retry logic."""
+    session = requests.Session()
+    retry_strategy = Retry(
+        total=3,  # number of retries
+        backoff_factor=1,  # wait 1, 2, 4 seconds between retries
+        status_forcelist=[500, 502, 503, 504]  # which status codes to retry
+    )
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
+def wait_for_api(api_base, max_retries=5, initial_delay=2):
+    """Wait for API to be ready with exponential backoff."""
+    session = create_session_with_retries()
+    for attempt in range(max_retries):
+        try:
+            response = session.get(
+                f"{api_base}/health",
+                timeout=5  # 5 second timeout for health check
+            )
+            if response.status_code == 200:
+                print(f"API ready after {attempt + 1} attempts")
+                return True
+        except Exception as e:
+            print(f"Attempt {attempt + 1} failed: {str(e)}")
+        
+        # Exponential backoff
+        delay = initial_delay * (2 ** attempt)
+        print(f"Waiting {delay} seconds before next attempt...")
+        time.sleep(delay)
+    
+    print("Max retries reached, API not ready")
+    return False
+
+
+
 def main():
     """Run all API tests."""
     print("Patent NLP API Test Suite")
@@ -143,7 +183,9 @@ def main():
     
     # Wait a moment for API to be ready
     print("Waiting for API to be ready...")
-    time.sleep(2)
+    if not wait_for_api(API_BASE):
+        print("❌ Failed to connect to API after multiple attempts")
+        return
     
     tests = [
         test_health,
