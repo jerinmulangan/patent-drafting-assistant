@@ -130,10 +130,10 @@ def main():
     print(f"Summarize API: {'✓ Working' if summarize_working else '✗ Failed'}")
     
     if backend_working and frontend_working and summarize_working:
-        print("\n🎉 ALL TESTS PASSED! Integration is working correctly.")
+        print("ALL TESTS PASSED! Integration is working correctly.")
         return True
     else:
-        print("\n❌ Some tests failed. Check the logs above.")
+        print("Some tests failed. Check the logs above.")
         return False
 
 if __name__ == "__main__":
