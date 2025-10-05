@@ -153,7 +153,7 @@ def main():
     # Install requirements
     if not install_requirements():
         print("\nSetup failed at package installation")
-        print("💡 Try running: pip install --upgrade pip")
+        print("Try running: pip install --upgrade pip")
         sys.exit(1)
     
     # Download NLTK data
@@ -164,13 +164,13 @@ def main():
     # Check data files
     if not check_data_files():
         print("\nSetup failed - missing data files")
-        print("💡 Please ensure you have the patent XML files")
+        print("Please ensure you have the patent XML files")
         sys.exit(1)
     
     # Run pipeline
     if not run_pipeline():
         print("\nSetup failed during pipeline execution")
-        print("💡 Check the error messages above")
+        print("Check the error messages above")
         sys.exit(1)
     
     # Test installation
