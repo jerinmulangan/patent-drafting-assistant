@@ -15,6 +15,7 @@ from pathlib import Path
 # Import search service
 from search_service import run_search, SearchRequest, format_results_for_api
 from search_utils import generate_snippet, analyze_query_log
+from ollama_service import get_ollama_service
 
 router = APIRouter()
 
@@ -124,6 +125,55 @@ class CompareModesRequestModel(BaseModel):
     rerank: bool = False
     include_snippets: bool = True
     include_metadata: bool = True
+
+
+class DraftRequestModel(BaseModel):
+    description: str
+    model: str = "llama3.2:3b"
+    template_type: str = "utility"
+    max_length: int = 2000
+    
+    @validator('description')
+    def validate_description(cls, v):
+        if not v or not v.strip():
+            raise ValueError('Description cannot be empty')
+        if len(v.strip()) < 50:
+            raise ValueError('Description too short (minimum 50 characters)')
+        if len(v) > 5000:
+            raise ValueError('Description too long (maximum 5000 characters)')
+        return v.strip()
+    
+    @validator('model')
+    def validate_model(cls, v):
+        valid_models = ["llama3.2:1b", "llama3.2:3b", "mistral:7b", "codellama:7b"]
+        if v not in valid_models:
+            raise ValueError(f'Model must be one of {valid_models}')
+        return v
+    
+    @validator('template_type')
+    def validate_template_type(cls, v):
+        valid_types = ["utility", "software", "medical", "design"]
+        if v not in valid_types:
+            raise ValueError(f'Template type must be one of {valid_types}')
+        return v
+    
+    @validator('max_length')
+    def validate_max_length(cls, v):
+        if v <= 0:
+            raise ValueError('max_length must be positive')
+        if v > 10000:
+            raise ValueError('max_length cannot exceed 10000')
+        return v
+
+
+class DraftResponseModel(BaseModel):
+    draft: str
+    model: str
+    template_type: str
+    generation_time: float
+    cached: bool = False
+    success: bool = True
+    message: str = "Draft generated successfully"
 
 
 @router.post("/search")
@@ -411,6 +461,157 @@ def _load_patent_from_file(doc_id: str, file_path: Path) -> Optional[Dict[str, A
         return None
     
     return None
+
+
+@router.post("/generate_draft", response_model=DraftResponseModel)
+async def generate_draft_endpoint(request: DraftRequestModel):
+    """
+    Generate patent application draft using local Ollama model.
+    """
+    try:
+        # Get Ollama service
+        ollama_service = get_ollama_service()
+        
+        # Check if Ollama is available
+        if not ollama_service.is_available():
+            raise HTTPException(
+                status_code=503, 
+                detail="Ollama service is not available. Please install and start Ollama."
+            )
+        
+        # Generate draft
+        result = ollama_service.generate_patent_draft(
+            description=request.description,
+            model_name=request.model,
+            template_type=request.template_type
+        )
+        
+        return DraftResponseModel(
+            draft=result["draft"],
+            model=result["model"],
+            template_type=result["template_type"],
+            generation_time=result["generation_time"],
+            cached=result.get("cached", False),
+            success=True,
+            message="Draft generated successfully"
+        )
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.get("/ollama/health")
+async def ollama_health_check():
+    """
+    Check Ollama service health and available models.
+    """
+    try:
+        ollama_service = get_ollama_service()
+        
+        if not ollama_service.is_available():
+            return {
+                "status": "unhealthy",
+                "message": "Ollama is not available",
+                "available_models": {},
+                "error": "Ollama service not running"
+            }
+        
+        available_models = ollama_service.get_available_models()
+        
+        return {
+            "status": "healthy",
+            "message": "Ollama service is running",
+            "available_models": available_models,
+            "default_model": ollama_service.model_name
+        }
+        
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "message": f"Error checking Ollama health: {str(e)}",
+            "available_models": {},
+            "error": str(e)
+        }
+
+
+@router.get("/ollama/models")
+async def get_available_models():
+    """
+    Get list of available Ollama models.
+    """
+    try:
+        ollama_service = get_ollama_service()
+        
+        if not ollama_service.is_available():
+            raise HTTPException(
+                status_code=503,
+                detail="Ollama service is not available"
+            )
+        
+        models = ollama_service.get_available_models()
+        model_info = {}
+        
+        for model_name in models:
+            info = ollama_service.get_model_info(model_name)
+            model_info[model_name] = info
+        
+        return {
+            "available_models": models,
+            "model_info": model_info,
+            "total_models": len(models)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/ollama/pull_model")
+async def pull_model(model_name: str):
+    """
+    Download a specific Ollama model.
+    """
+    try:
+        ollama_service = get_ollama_service()
+        
+        if not ollama_service.is_available():
+            raise HTTPException(
+                status_code=503,
+                detail="Ollama service is not available"
+            )
+        
+        # Validate model name
+        valid_models = ["llama3.2:1b", "llama3.2:3b", "mistral:7b", "codellama:7b"]
+        if model_name not in valid_models:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid model name. Must be one of: {valid_models}"
+            )
+        
+        # Pull the model
+        success = ollama_service.ensure_model_available(model_name)
+        
+        if success:
+            return {
+                "success": True,
+                "message": f"Model {model_name} downloaded successfully",
+                "model_name": model_name
+            }
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to download model {model_name}"
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # Global exception handler for validation errors

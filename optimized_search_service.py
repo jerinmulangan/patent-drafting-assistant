@@ -118,6 +118,10 @@ def optimized_semantic_search(query: str, top_k: int = 5, rerank: bool = False,
         search_k = top_k * 3 if rerank else top_k
         scores, indices = index.search(query_embedding.astype('float32'), search_k)
         
+        # Load patent metadata for enrichment
+        from search_utils import load_patent_metadata
+        patent_metadata = load_patent_metadata()
+        
         # Get results
         results = []
         for i, (score, idx) in enumerate(zip(scores[0], indices[0])):
@@ -125,22 +129,27 @@ def optimized_semantic_search(query: str, top_k: int = 5, rerank: bool = False,
                 continue
             
             doc_id = ids[idx]
-            meta = metadata[idx]
+            chunk_meta = metadata[idx]
+            
+            # Get base document ID
+            base_doc_id = doc_id.split('_chunk')[0] if '_chunk' in doc_id else doc_id
+            
+            # Get patent metadata
+            patent_meta = patent_metadata.get(base_doc_id, {})
             
             # Get chunk text
             chunk_text = _get_chunk_text_cached(doc_id)
             
-            results.append((
-                doc_id,
-                float(score),
-                {
-                    "title": meta.get("title", ""),
-                    "doc_type": meta.get("doc_type", "unknown"),
-                    "source_file": meta.get("source_file", ""),
-                    "base_doc_id": meta.get("base_doc_id", ""),
-                    "chunk_text": chunk_text or ""
-                }
-            ))
+            # Combine metadata
+            enriched_meta = {
+                "title": patent_meta.get("title", ""),
+                "doc_type": patent_meta.get("doc_type", "unknown"),
+                "source_file": patent_meta.get("source_file", ""),
+                "base_doc_id": base_doc_id,
+                "chunk_text": chunk_text or ""
+            }
+            
+            results.append((doc_id, float(score), enriched_meta))
         
         # Re-rank if requested
         if rerank and len(results) > top_k:
