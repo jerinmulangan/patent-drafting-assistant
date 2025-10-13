@@ -17,6 +17,7 @@ from pathlib import Path
 from ollama_service import get_ollama_service
 from search_service import run_search, SearchRequest, SearchResult
 from search_utils import load_patent_metadata
+from section_similarity_analyzer import SectionSimilarityAnalyzer, get_section_similarity_map
 
 
 @dataclass
@@ -50,6 +51,7 @@ class AsyncOrchestrationService:
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
         self.ollama_service = get_ollama_service()
         self.patent_metadata = None
+        self.section_analyzer = SectionSimilarityAnalyzer(max_workers=max_workers)
     
     async def generate_with_background_search(
         self, 
@@ -179,39 +181,23 @@ class AsyncOrchestrationService:
         include_snippets: bool
     ) -> Dict[str, SectionSimilarity]:
         """Analyze similarity for each section of the generated draft."""
-        results, _ = search_results
-        sections = self._parse_draft_sections(draft)
+        # Use the dedicated section analyzer
+        section_results = await self.section_analyzer.analyze_all_sections(
+            draft,
+            search_mode=search_mode,
+            top_k=top_k,
+            include_snippets=include_snippets
+        )
+        
+        # Convert to SectionSimilarity format for compatibility
         section_similarities = {}
-        
-        # Create tasks for each section analysis
-        tasks = []
-        for section_name, section_text in sections.items():
-            if section_text.strip():
-                task = asyncio.create_task(
-                    self._analyze_single_section(
-                        section_name, 
-                        section_text, 
-                        search_mode, 
-                        top_k, 
-                        include_snippets
-                    )
-                )
-                tasks.append((section_name, task))
-        
-        # Wait for all section analyses to complete
-        for section_name, task in tasks:
-            try:
-                similarity = await task
-                section_similarities[section_name] = similarity
-            except Exception as e:
-                print(f"Error analyzing section {section_name}: {e}")
-                # Create empty similarity for failed sections
-                section_similarities[section_name] = SectionSimilarity(
-                    section_name=section_name,
-                    section_text="",
-                    similar_patents=[],
-                    analysis_time=0.0
-                )
+        for section_name, result in section_results.items():
+            section_similarities[section_name] = SectionSimilarity(
+                section_name=result.section_name,
+                section_text=result.section_text,
+                similar_patents=result.similar_patents,
+                analysis_time=result.analysis_time
+            )
         
         return section_similarities
     
@@ -301,22 +287,13 @@ class AsyncOrchestrationService:
             Dict mapping section names to similarity data
         """
         if isinstance(draft, DraftWithSimilarity):
-            section_similarities = draft.section_similarities
-        elif isinstance(draft, dict) and "section_similarities" in draft:
-            section_similarities = draft["section_similarities"]
-        else:
-            return {}
-        
-        similarity_map = {}
-        for section_name, similarity in section_similarities.items():
-            similarity_map[section_name] = {
-                "section_name": similarity.section_name,
-                "similar_patents": similarity.similar_patents,
-                "analysis_time": similarity.analysis_time,
-                "patent_count": len(similarity.similar_patents)
+            draft_dict = {
+                "section_similarities": draft.section_similarities
             }
+        else:
+            draft_dict = draft
         
-        return similarity_map
+        return get_section_similarity_map(draft_dict)
     
     def to_json_schema(self, result: DraftWithSimilarity) -> Dict[str, Any]:
         """Convert result to JSON-serializable format."""
