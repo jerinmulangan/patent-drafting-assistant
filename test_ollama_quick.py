@@ -31,7 +31,7 @@ def test_ollama_integration():
             print(f"Model used: {result['model']}")
             print(f"Template type: {result['template_type']}")
             
-            print("\n📄 Draft preview:")
+            print("\nDraft preview:")
             print("-" * 50)
             print(result['draft'][:800] + "..." if len(result['draft']) > 800 else result['draft'])
             print("-" * 50)
@@ -43,3 +43,8 @@ def test_ollama_integration():
 
 if __name__ == "__main__":
     test_ollama_integration()
+
+
+
+
+
