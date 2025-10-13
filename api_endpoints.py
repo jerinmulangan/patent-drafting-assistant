@@ -16,6 +16,7 @@ from pathlib import Path
 from search_service import run_search, SearchRequest, format_results_for_api
 from search_utils import generate_snippet, analyze_query_log
 from ollama_service import get_ollama_service
+from async_orchestration import get_orchestration_service, DraftWithSimilarity
 
 router = APIRouter()
 
@@ -174,6 +175,75 @@ class DraftResponseModel(BaseModel):
     cached: bool = False
     success: bool = True
     message: str = "Draft generated successfully"
+
+
+class SectionSimilarityModel(BaseModel):
+    section_name: str
+    section_text: str
+    similar_patents: List[Dict[str, Any]]
+    analysis_time: float
+    patent_count: int
+
+
+class DraftWithSimilarityRequestModel(BaseModel):
+    description: str
+    search_mode: str = "hybrid"
+    model: str = "llama3.2:3b"
+    template_type: str = "utility"
+    top_k: int = 5
+    include_snippets: bool = True
+    use_cache: bool = True
+    
+    @validator('description')
+    def validate_description(cls, v):
+        if not v or not v.strip():
+            raise ValueError('Description cannot be empty')
+        if len(v.strip()) < 50:
+            raise ValueError('Description too short (minimum 50 characters)')
+        if len(v) > 5000:
+            raise ValueError('Description too long (maximum 5000 characters)')
+        return v.strip()
+    
+    @validator('search_mode')
+    def validate_search_mode(cls, v):
+        valid_modes = ["tfidf", "semantic", "hybrid", "hybrid-advanced"]
+        if v not in valid_modes:
+            raise ValueError(f'Search mode must be one of {valid_modes}')
+        return v
+    
+    @validator('model')
+    def validate_model(cls, v):
+        valid_models = ["llama3.2:1b", "llama3.2:3b", "mistral:7b", "codellama:7b"]
+        if v not in valid_models:
+            raise ValueError(f'Model must be one of {valid_models}')
+        return v
+    
+    @validator('template_type')
+    def validate_template_type(cls, v):
+        valid_types = ["utility", "software", "medical", "design"]
+        if v not in valid_types:
+            raise ValueError(f'Template type must be one of {valid_types}')
+        return v
+    
+    @validator('top_k')
+    def validate_top_k(cls, v):
+        if v <= 0:
+            raise ValueError('top_k must be positive')
+        if v > 20:
+            raise ValueError('top_k cannot exceed 20 for similarity analysis')
+        return v
+
+
+class DraftWithSimilarityResponseModel(BaseModel):
+    draft: str
+    model: str
+    template_type: str
+    generation_time: float
+    cached: bool
+    section_similarities: Dict[str, SectionSimilarityModel]
+    total_analysis_time: float
+    success: bool
+    message: str
 
 
 @router.post("/search")
@@ -494,6 +564,65 @@ async def generate_draft_endpoint(request: DraftRequestModel):
             cached=result.get("cached", False),
             success=True,
             message="Draft generated successfully"
+        )
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@router.post("/generate_draft_with_similarity", response_model=DraftWithSimilarityResponseModel)
+async def generate_draft_with_similarity_endpoint(request: DraftWithSimilarityRequestModel):
+    """
+    Generate patent application draft with concurrent background search and section-level similarity analysis.
+    """
+    try:
+        # Get orchestration service
+        orchestration_service = get_orchestration_service()
+        
+        # Check if Ollama is available
+        ollama_service = get_ollama_service()
+        if not ollama_service.is_available():
+            raise HTTPException(
+                status_code=503, 
+                detail="Ollama service is not available. Please install and start Ollama."
+            )
+        
+        # Generate draft with background search
+        result = await orchestration_service.generate_with_background_search(
+            prompt=request.description,
+            search_mode=request.search_mode,
+            model_name=request.model,
+            template_type=request.template_type,
+            top_k=request.top_k,
+            include_snippets=request.include_snippets,
+            use_cache=request.use_cache
+        )
+        
+        # Convert to response model
+        section_similarities = {}
+        for section_name, similarity in result.section_similarities.items():
+            section_similarities[section_name] = SectionSimilarityModel(
+                section_name=similarity.section_name,
+                section_text=similarity.section_text,
+                similar_patents=similarity.similar_patents,
+                analysis_time=similarity.analysis_time,
+                patent_count=len(similarity.similar_patents)
+            )
+        
+        return DraftWithSimilarityResponseModel(
+            draft=result.draft,
+            model=result.model,
+            template_type=result.template_type,
+            generation_time=result.generation_time,
+            cached=result.cached,
+            section_similarities=section_similarities,
+            total_analysis_time=result.total_analysis_time,
+            success=result.success,
+            message=result.message
         )
         
     except ValueError as e:
