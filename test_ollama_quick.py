@@ -26,20 +26,20 @@ def test_ollama_integration():
                 template_type="utility"
             )
             
-            print(f"✅ Generated draft length: {len(result['draft'])} characters")
-            print(f"✅ Generation time: {result['generation_time']:.2f} seconds")
-            print(f"✅ Model used: {result['model']}")
-            print(f"✅ Template type: {result['template_type']}")
+            print(f"Generated draft length: {len(result['draft'])} characters")
+            print(f"Generation time: {result['generation_time']:.2f} seconds")
+            print(f"Model used: {result['model']}")
+            print(f"Template type: {result['template_type']}")
             
-            print("\n📄 Draft preview:")
+            print("\nDraft preview:")
             print("-" * 50)
             print(result['draft'][:800] + "..." if len(result['draft']) > 800 else result['draft'])
             print("-" * 50)
             
         except Exception as e:
-            print(f"❌ Error generating draft: {e}")
+            print(f"Error generating draft: {e}")
     else:
-        print("❌ Ollama is not available")
+        print("Ollama is not available")
 
 if __name__ == "__main__":
     test_ollama_integration()
