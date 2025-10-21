@@ -51,6 +51,9 @@ async def root():
             "summarize": "/api/v1/summarize", 
             "batch_search": "/api/v1/batch_search",
             "compare_modes": "/api/v1/compare_modes",
+            "generate_draft": "/api/v1/generate_draft",
+            "generate_draft_with_similarity": "/api/v1/generate_draft_with_similarity",
+            "generate_with_search": "/api/v1/generate_with_search",
             "logs_analyze": "/api/v1/logs/analyze",
             "health": "/api/v1/health"
         }

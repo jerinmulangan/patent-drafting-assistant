@@ -336,3 +336,5 @@ if __name__ == "__main__":
     print(f"Properties: {len(info.get('properties', []))}")
     
     print("\nSchema validator test completed!")
+
+
