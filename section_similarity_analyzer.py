@@ -355,3 +355,5 @@ CLAIMS
         print("\nSection similarity analyzer test completed!")
     
     asyncio.run(test_analyzer())
+
+

@@ -532,3 +532,5 @@ if __name__ == "__main__":
             print(f"{schema_file} not found")
     
     print("\nSchema validation tests completed!")
+
+
