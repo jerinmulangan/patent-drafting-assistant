@@ -1,6 +1,6 @@
 *.npz
 *.xml
 *.jsonl
+
+data/
 __pycache__/
-*.py[cod]
-*.pyo
