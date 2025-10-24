@@ -3,3 +3,4 @@
 *.jsonl
 
 data/
+__pycache__/
