@@ -1,0 +1,119 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Draft with Similarity Response Schema",
+  "description": "Unified response schema combining generated patent draft and similarity analysis",
+  "type": "object",
+  "properties": {
+    "draft": {
+      "type": "string",
+      "description": "The generated patent application draft text"
+    },
+    "model": {
+      "type": "string",
+      "description": "The Ollama model used for generation"
+    },
+    "template_type": {
+      "type": "string",
+      "enum": ["utility", "software", "medical", "design"],
+      "description": "The patent template type used"
+    },
+    "generation_time": {
+      "type": "number",
+      "description": "Time taken to generate the draft in seconds"
+    },
+    "cached": {
+      "type": "boolean",
+      "description": "Whether the result was retrieved from cache"
+    },
+    "section_similarities": {
+      "type": "object",
+      "description": "Similarity analysis for each section of the draft",
+      "patternProperties": {
+        "^[a-z_]+$": {
+          "type": "object",
+          "properties": {
+            "section_name": {
+              "type": "string",
+              "description": "Name of the patent section"
+            },
+            "section_text": {
+              "type": "string",
+              "description": "Text content of the section"
+            },
+            "similar_patents": {
+              "type": "array",
+              "description": "List of similar patents found for this section",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "patent_id": {
+                    "type": "string",
+                    "description": "Unique identifier of the similar patent"
+                  },
+                  "title": {
+                    "type": "string",
+                    "description": "Title of the similar patent"
+                  },
+                  "similarity_score": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Similarity score between 0 and 1"
+                  },
+                  "doc_type": {
+                    "type": "string",
+                    "enum": ["grant", "application"],
+                    "description": "Type of patent document"
+                  },
+                  "snippet": {
+                    "type": "string",
+                    "description": "Relevant text snippet from the patent"
+                  },
+                  "source_file": {
+                    "type": "string",
+                    "description": "Source file of the patent document"
+                  }
+                },
+                "required": ["patent_id", "title", "similarity_score", "doc_type"]
+              }
+            },
+            "analysis_time": {
+              "type": "number",
+              "description": "Time taken to analyze this section in seconds"
+            },
+            "patent_count": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of similar patents found"
+            }
+          },
+          "required": ["section_name", "similar_patents", "analysis_time", "patent_count"]
+        }
+      }
+    },
+    "total_analysis_time": {
+      "type": "number",
+      "description": "Total time for both generation and similarity analysis in seconds"
+    },
+    "success": {
+      "type": "boolean",
+      "description": "Whether the operation completed successfully"
+    },
+    "message": {
+      "type": "string",
+      "description": "Status message or error description"
+    }
+  },
+  "required": [
+    "draft",
+    "model", 
+    "template_type",
+    "generation_time",
+    "cached",
+    "section_similarities",
+    "total_analysis_time",
+    "success",
+    "message"
+  ],
+  "additionalProperties": false
+}
