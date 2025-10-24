@@ -17,6 +17,7 @@ from search_service import run_search, SearchRequest, format_results_for_api
 from search_utils import generate_snippet, analyze_query_log
 from ollama_service import get_ollama_service
 from async_orchestration import get_orchestration_service, DraftWithSimilarity
+from similarity_visualizer import get_similarity_visualizer
 
 router = APIRouter()
 
@@ -187,6 +188,36 @@ class DraftWithSearchResponseModel(DraftResponseModel):
     similar_patents: List[Dict[str, Any]] = []
     search_mode: str = "semantic"
     search_top_k: int = 5
+
+
+class SimilarityMatchModel(BaseModel):
+    draft_text: str
+    prior_text: str
+    similarity_score: float
+    prior_patent_id: str
+    prior_title: str
+    section_type: str
+
+
+class HighlightedSectionModel(BaseModel):
+    section_name: str
+    text: str
+    html_output: str
+    markdown_output: str
+    similarity_matches: List[SimilarityMatchModel]
+
+
+class DraftWithSimilarityVisualizationModel(BaseModel):
+    draft: str
+    model: str
+    template_type: str
+    generation_time: float
+    cached: bool
+    similar_patents: List[Dict[str, Any]]
+    highlighted_sections: Dict[str, HighlightedSectionModel]
+    similarity_statistics: Dict[str, Any]
+    search_mode: str
+    search_top_k: int
 
 
 class SectionSimilarityModel(BaseModel):
@@ -876,6 +907,96 @@ def extract_claims_from_draft(draft: str) -> List[str]:
     import re
     claims = re.findall(r'Claim \d+\.\s*(.*?)(?=\n\nClaim \d+\.|\Z)', draft, re.DOTALL)
     return [claim.strip() for claim in claims if claim.strip()]
+
+
+@router.post("/generate_draft_with_visualization", response_model=DraftWithSimilarityVisualizationModel)
+async def generate_draft_with_visualization_endpoint(request: DraftWithSearchRequestModel):
+    """
+    Generate a patent draft with similarity visualization and highlighting.
+    """
+    try:
+        # Generate the draft
+        draft_result = await generate_draft_endpoint(request)
+        
+        # Extract claims for similarity search
+        claims = extract_claims_from_draft(draft_result.draft)
+        
+        # If no claims found, use the original description for search
+        if not claims:
+            claims = [request.description]
+        
+        # Search for similar patents
+        search_results = []
+        for claim in claims:
+            search_request = SearchRequest(
+                query=claim,
+                mode=request.search_mode,
+                top_k=request.search_top_k,
+                include_snippets=request.include_snippets,
+                include_metadata=request.include_metadata
+            )
+            results, _ = run_search(search_request)
+            search_results.extend([r.to_dict() for r in results])
+            print(f"DEBUG: Search for '{claim[:50]}...' returned {len(results)} results")
+        
+        # Deduplicate results by doc_id
+        seen = set()
+        unique_results = []
+        for result in search_results:
+            if result['doc_id'] not in seen:
+                seen.add(result['doc_id'])
+                unique_results.append(result)
+        
+        # Limit to requested top_k
+        similar_patents = unique_results[:request.search_top_k]
+        
+        # Debug logging
+        print(f"DEBUG: Found {len(similar_patents)} similar patents")
+        if similar_patents:
+            print(f"DEBUG: First patent: {similar_patents[0]}")
+        
+        # Perform similarity visualization
+        visualizer = get_similarity_visualizer()
+        similarity_report = visualizer.generate_similarity_report(draft_result.draft, similar_patents)
+        
+        # Convert to response models
+        highlighted_sections = {}
+        for section_name, section_data in similarity_report["highlighted_sections"].items():
+            similarity_matches = [
+                SimilarityMatchModel(
+                    draft_text=match["draft_text"],
+                    prior_text=match["prior_text"],
+                    similarity_score=match["similarity_score"],
+                    prior_patent_id=match["prior_patent_id"],
+                    prior_title=match["prior_title"],
+                    section_type=match["section_type"]
+                )
+                for match in section_data["similarity_matches"]
+            ]
+            
+            highlighted_sections[section_name] = HighlightedSectionModel(
+                section_name=section_name,
+                text=section_data["text"],
+                html_output=section_data["html_output"],
+                markdown_output=section_data["markdown_output"],
+                similarity_matches=similarity_matches
+            )
+        
+        return DraftWithSimilarityVisualizationModel(
+            draft=draft_result.draft,
+            model=draft_result.model,
+            template_type=draft_result.template_type,
+            generation_time=draft_result.generation_time,
+            cached=draft_result.cached,
+            similar_patents=similar_patents,
+            highlighted_sections=highlighted_sections,
+            similarity_statistics=similarity_report["statistics"],
+            search_mode=request.search_mode,
+            search_top_k=request.search_top_k
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Visualization generation failed: {str(e)}")
 
 
 # Global exception handler for validation errors

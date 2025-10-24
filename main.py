@@ -54,6 +54,7 @@ async def root():
             "generate_draft": "/api/v1/generate_draft",
             "generate_draft_with_similarity": "/api/v1/generate_draft_with_similarity",
             "generate_with_search": "/api/v1/generate_with_search",
+            "generate_draft_with_visualization": "/api/v1/generate_draft_with_visualization",
             "logs_analyze": "/api/v1/logs/analyze",
             "health": "/api/v1/health"
         }
