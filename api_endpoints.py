@@ -16,6 +16,8 @@ from pathlib import Path
 from search_service import run_search, SearchRequest, format_results_for_api
 from search_utils import generate_snippet, analyze_query_log
 from ollama_service import get_ollama_service
+from async_orchestration import get_orchestration_service, DraftWithSimilarity
+from similarity_visualizer import get_similarity_visualizer
 
 router = APIRouter()
 
@@ -185,6 +187,117 @@ class DraftWithSearchResponseModel(DraftResponseModel):
     similar_patents: List[Dict[str, Any]] = []
     search_mode: str = "semantic"
     search_top_k: int = 5
+
+
+class DraftWithSearchRequestModel(DraftRequestModel):
+    search_mode: str = "semantic"
+    search_top_k: int = 5
+    include_snippets: bool = True
+    include_metadata: bool = True
+
+class DraftWithSearchResponseModel(DraftResponseModel):
+    similar_patents: List[Dict[str, Any]] = []
+    search_mode: str = "semantic"
+    search_top_k: int = 5
+
+
+class SimilarityMatchModel(BaseModel):
+    draft_text: str
+    prior_text: str
+    similarity_score: float
+    prior_patent_id: str
+    prior_title: str
+    section_type: str
+
+
+class HighlightedSectionModel(BaseModel):
+    section_name: str
+    text: str
+    html_output: str
+    markdown_output: str
+    similarity_matches: List[SimilarityMatchModel]
+
+
+class DraftWithSimilarityVisualizationModel(BaseModel):
+    draft: str
+    model: str
+    template_type: str
+    generation_time: float
+    cached: bool
+    similar_patents: List[Dict[str, Any]]
+    highlighted_sections: Dict[str, HighlightedSectionModel]
+    similarity_statistics: Dict[str, Any]
+    search_mode: str
+    search_top_k: int
+
+
+class SectionSimilarityModel(BaseModel):
+    section_name: str
+    section_text: str
+    similar_patents: List[Dict[str, Any]]
+    analysis_time: float
+    patent_count: int
+
+
+class DraftWithSimilarityRequestModel(BaseModel):
+    description: str
+    search_mode: str = "hybrid"
+    model: str = "llama3.2:3b"
+    template_type: str = "utility"
+    top_k: int = 5
+    include_snippets: bool = True
+    use_cache: bool = True
+    
+    @validator('description')
+    def validate_description(cls, v):
+        if not v or not v.strip():
+            raise ValueError('Description cannot be empty')
+        if len(v.strip()) < 50:
+            raise ValueError('Description too short (minimum 50 characters)')
+        if len(v) > 5000:
+            raise ValueError('Description too long (maximum 5000 characters)')
+        return v.strip()
+    
+    @validator('search_mode')
+    def validate_search_mode(cls, v):
+        valid_modes = ["tfidf", "semantic", "hybrid", "hybrid-advanced"]
+        if v not in valid_modes:
+            raise ValueError(f'Search mode must be one of {valid_modes}')
+        return v
+    
+    @validator('model')
+    def validate_model(cls, v):
+        valid_models = ["llama3.2:1b", "llama3.2:3b", "mistral:7b", "codellama:7b"]
+        if v not in valid_models:
+            raise ValueError(f'Model must be one of {valid_models}')
+        return v
+    
+    @validator('template_type')
+    def validate_template_type(cls, v):
+        valid_types = ["utility", "software", "medical", "design"]
+        if v not in valid_types:
+            raise ValueError(f'Template type must be one of {valid_types}')
+        return v
+    
+    @validator('top_k')
+    def validate_top_k(cls, v):
+        if v <= 0:
+            raise ValueError('top_k must be positive')
+        if v > 20:
+            raise ValueError('top_k cannot exceed 20 for similarity analysis')
+        return v
+
+
+class DraftWithSimilarityResponseModel(BaseModel):
+    draft: str
+    model: str
+    template_type: str
+    generation_time: float
+    cached: bool
+    section_similarities: Dict[str, SectionSimilarityModel]
+    total_analysis_time: float
+    success: bool
+    message: str
 
 
 @router.post("/search")
@@ -568,6 +681,134 @@ async def generate_draft_endpoint(request: DraftRequestModel):
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
+@router.post("/generate_draft_with_similarity", response_model=DraftWithSimilarityResponseModel)
+async def generate_draft_with_similarity_endpoint(request: DraftWithSimilarityRequestModel):
+    """
+    Generate patent application draft with concurrent background search and section-level similarity analysis.
+    """
+    try:
+        # Get orchestration service
+        orchestration_service = get_orchestration_service()
+        
+        # Check if Ollama is available
+        ollama_service = get_ollama_service()
+        if not ollama_service.is_available():
+            raise HTTPException(
+                status_code=503, 
+                detail="Ollama service is not available. Please install and start Ollama."
+            )
+        
+        # Generate draft with background search
+        result = await orchestration_service.generate_with_background_search(
+            prompt=request.description,
+            search_mode=request.search_mode,
+            model_name=request.model,
+            template_type=request.template_type,
+            top_k=request.top_k,
+            include_snippets=request.include_snippets,
+            use_cache=request.use_cache
+        )
+        
+        # Convert to response model
+        section_similarities = {}
+        for section_name, similarity in result.section_similarities.items():
+            section_similarities[section_name] = SectionSimilarityModel(
+                section_name=similarity.section_name,
+                section_text=similarity.section_text,
+                similar_patents=similarity.similar_patents,
+                analysis_time=similarity.analysis_time,
+                patent_count=len(similarity.similar_patents)
+            )
+        
+        return DraftWithSimilarityResponseModel(
+            draft=result.draft,
+            model=result.model,
+            template_type=result.template_type,
+            generation_time=result.generation_time,
+            cached=result.cached,
+            section_similarities=section_similarities,
+            total_analysis_time=result.total_analysis_time,
+            success=result.success,
+            message=result.message
+        )
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+class GenerateWithSearchRequestModel(BaseModel):
+    """Request model for generate_with_search endpoint."""
+    description: str
+    model: str = "llama3.2:3b"
+    template_type: str = "utility"
+    search_mode: str = "hybrid"
+    top_k: int = 5
+    include_snippets: bool = True
+    use_cache: bool = True
+    
+    @validator('description')
+    def validate_description(cls, v):
+        if not v or len(v.strip()) < 50:
+            raise ValueError('Description must be at least 50 characters long')
+        if len(v) > 5000:
+            raise ValueError('Description must be no more than 5000 characters long')
+        return v.strip()
+    
+    @validator('model')
+    def validate_model(cls, v):
+        valid_models = ["llama3.2:1b", "llama3.2:3b", "mistral:7b", "codellama:7b"]
+        if v not in valid_models:
+            raise ValueError(f'Model must be one of {valid_models}')
+        return v
+    
+    @validator('template_type')
+    def validate_template_type(cls, v):
+        valid_types = ["utility", "software", "medical", "design"]
+        if v not in valid_types:
+            raise ValueError(f'Template type must be one of {valid_types}')
+        return v
+    
+    @validator('search_mode')
+    def validate_search_mode(cls, v):
+        valid_modes = ["tfidf", "semantic", "hybrid", "hybrid-advanced"]
+        if v not in valid_modes:
+            raise ValueError(f'Search mode must be one of {valid_modes}')
+        return v
+    
+    @validator('top_k')
+    def validate_top_k(cls, v):
+        if not 1 <= v <= 20:
+            raise ValueError('top_k must be between 1 and 20')
+        return v
+
+
+class StatusUpdateModel(BaseModel):
+    """Model for status updates during generation."""
+    step: str
+    message: str
+    progress: float  # 0.0 to 1.0
+    timestamp: str
+
+
+class GenerateWithSearchResponseModel(BaseModel):
+    """Response model for generate_with_search endpoint."""
+    draft: str
+    model: str
+    template_type: str
+    generation_time: float
+    cached: bool
+    section_similarities: Dict[str, SectionSimilarityModel]
+    total_analysis_time: float
+    success: bool
+    message: str
+    metadata: Dict[str, Any]
+    status_updates: List[StatusUpdateModel] = []
+
+
 @router.get("/ollama/health")
 async def ollama_health_check():
     """
@@ -676,6 +917,150 @@ async def pull_model(model_name: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/generate_with_search", response_model=DraftWithSearchResponseModel)
+async def generate_with_search_endpoint(request: DraftWithSearchRequestModel):
+    """Generate a patent draft and find similar patents based on claims."""
+    # Generate the draft
+    draft_result = await generate_draft_endpoint(request)
+    
+    # Extract claims (you'll need to implement this function)
+    claims = extract_claims_from_draft(draft_result.draft)
+    
+    if not claims:
+        return {
+            **draft_result.dict(),
+            "similar_patents": [],
+            "search_mode": request.search_mode,
+            "search_top_k": request.search_top_k,
+            "message": "No claims found in the generated draft"
+        }
+    
+    # Search for similar patents
+    search_results = []
+    for claim in claims:
+        search_request = SearchRequest(
+            query=claim,
+            mode=request.search_mode,
+            top_k=request.search_top_k,
+            include_snippets=request.include_snippets,
+            include_metadata=request.include_metadata
+        )
+        results, _ = run_search(search_request)
+        search_results.extend([r.to_dict() for r in results])
+    
+    # Deduplicate results by doc_id
+    seen = set()
+    unique_results = []
+    for result in search_results:
+        if result['doc_id'] not in seen:
+            seen.add(result['doc_id'])
+            unique_results.append(result)
+    
+    return {
+        **draft_result.dict(),
+        "similar_patents": unique_results[:request.search_top_k],
+        "search_mode": request.search_mode,
+        "search_top_k": request.search_top_k
+    }
+
+def extract_claims_from_draft(draft: str) -> List[str]:
+    """Extract claims from the generated draft text."""
+    # This is a simple implementation - you may need to adjust based on your draft format
+    import re
+    claims = re.findall(r'Claim \d+\.\s*(.*?)(?=\n\nClaim \d+\.|\Z)', draft, re.DOTALL)
+    return [claim.strip() for claim in claims if claim.strip()]
+
+
+@router.post("/generate_draft_with_visualization", response_model=DraftWithSimilarityVisualizationModel)
+async def generate_draft_with_visualization_endpoint(request: DraftWithSearchRequestModel):
+    """
+    Generate a patent draft with similarity visualization and highlighting.
+    """
+    try:
+        # Generate the draft
+        draft_result = await generate_draft_endpoint(request)
+        
+        # Extract claims for similarity search
+        claims = extract_claims_from_draft(draft_result.draft)
+        
+        # If no claims found, use the original description for search
+        if not claims:
+            claims = [request.description]
+        
+        # Search for similar patents
+        search_results = []
+        for claim in claims:
+            search_request = SearchRequest(
+                query=claim,
+                mode=request.search_mode,
+                top_k=request.search_top_k,
+                include_snippets=request.include_snippets,
+                include_metadata=request.include_metadata
+            )
+            results, _ = run_search(search_request)
+            search_results.extend([r.to_dict() for r in results])
+            print(f"DEBUG: Search for '{claim[:50]}...' returned {len(results)} results")
+        
+        # Deduplicate results by doc_id
+        seen = set()
+        unique_results = []
+        for result in search_results:
+            if result['doc_id'] not in seen:
+                seen.add(result['doc_id'])
+                unique_results.append(result)
+        
+        # Limit to requested top_k
+        similar_patents = unique_results[:request.search_top_k]
+        
+        # Debug logging
+        print(f"DEBUG: Found {len(similar_patents)} similar patents")
+        if similar_patents:
+            print(f"DEBUG: First patent: {similar_patents[0]}")
+        
+        # Perform similarity visualization
+        visualizer = get_similarity_visualizer()
+        similarity_report = visualizer.generate_similarity_report(draft_result.draft, similar_patents)
+        
+        # Convert to response models
+        highlighted_sections = {}
+        for section_name, section_data in similarity_report["highlighted_sections"].items():
+            similarity_matches = [
+                SimilarityMatchModel(
+                    draft_text=match["draft_text"],
+                    prior_text=match["prior_text"],
+                    similarity_score=match["similarity_score"],
+                    prior_patent_id=match["prior_patent_id"],
+                    prior_title=match["prior_title"],
+                    section_type=match["section_type"]
+                )
+                for match in section_data["similarity_matches"]
+            ]
+            
+            highlighted_sections[section_name] = HighlightedSectionModel(
+                section_name=section_name,
+                text=section_data["text"],
+                html_output=section_data["html_output"],
+                markdown_output=section_data["markdown_output"],
+                similarity_matches=similarity_matches
+            )
+        
+        return DraftWithSimilarityVisualizationModel(
+            draft=draft_result.draft,
+            model=draft_result.model,
+            template_type=draft_result.template_type,
+            generation_time=draft_result.generation_time,
+            cached=draft_result.cached,
+            similar_patents=similar_patents,
+            highlighted_sections=highlighted_sections,
+            similarity_statistics=similarity_report["statistics"],
+            search_mode=request.search_mode,
+            search_top_k=request.search_top_k
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Visualization generation failed: {str(e)}")
 
 
 # Global exception handler for validation errors
