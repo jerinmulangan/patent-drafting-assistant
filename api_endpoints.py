@@ -177,6 +177,17 @@ class DraftResponseModel(BaseModel):
     success: bool = True
     message: str = "Draft generated successfully"
 
+class DraftWithSearchRequestModel(DraftRequestModel):
+    search_mode: str = "semantic"
+    search_top_k: int = 5
+    include_snippets: bool = True
+    include_metadata: bool = True
+
+class DraftWithSearchResponseModel(DraftResponseModel):
+    similar_patents: List[Dict[str, Any]] = []
+    search_mode: str = "semantic"
+    search_top_k: int = 5
+
 
 class DraftWithSearchRequestModel(DraftRequestModel):
     search_mode: str = "semantic"
@@ -574,6 +585,59 @@ def _load_patent_from_file(doc_id: str, file_path: Path) -> Optional[Dict[str, A
         return None
     
     return None
+
+@router.post("/generate_with_search", response_model=DraftWithSearchResponseModel)
+async def generate_with_search_endpoint(request: DraftWithSearchRequestModel):
+    """Generate a patent draft and find similar patents based on claims."""
+    # Generate the draft
+    draft_result = await generate_draft_endpoint(request)
+    
+    # Extract claims (you'll need to implement this function)
+    claims = extract_claims_from_draft(draft_result.draft)
+    
+    if not claims:
+        return {
+            **draft_result.dict(),
+            "similar_patents": [],
+            "search_mode": request.search_mode,
+            "search_top_k": request.search_top_k,
+            "message": "No claims found in the generated draft"
+        }
+    
+    # Search for similar patents
+    search_results = []
+    for claim in claims:
+        search_request = SearchRequest(
+            query=claim,
+            mode=request.search_mode,
+            top_k=request.search_top_k,
+            include_snippets=request.include_snippets,
+            include_metadata=request.include_metadata
+        )
+        results, _ = run_search(search_request)
+        search_results.extend([r.to_dict() for r in results])
+    
+    # Deduplicate results by doc_id
+    seen = set()
+    unique_results = []
+    for result in search_results:
+        if result['doc_id'] not in seen:
+            seen.add(result['doc_id'])
+            unique_results.append(result)
+    
+    return {
+        **draft_result.dict(),
+        "similar_patents": unique_results[:request.search_top_k],
+        "search_mode": request.search_mode,
+        "search_top_k": request.search_top_k
+    }
+
+def extract_claims_from_draft(draft: str) -> List[str]:
+    """Extract claims from the generated draft text."""
+    # This is a simple implementation - you may need to adjust based on your draft format
+    import re
+    claims = re.findall(r'Claim \d+\.\s*(.*?)(?=\n\nClaim \d+\.|\Z)', draft, re.DOTALL)
+    return [claim.strip() for claim in claims if claim.strip()]
 
 
 @router.post("/generate_draft", response_model=DraftResponseModel)
