@@ -843,19 +843,45 @@ async def generate_draft_advanced_endpoint(request: AdvancedDraftRequestModel):
             use_critique=request.use_critique
         )
         
+        # Validate result structure
+        if not isinstance(result, dict):
+            raise ValueError(f"Expected dict from generate_complete_draft, got {type(result)}")
+        
+        if "sections" not in result:
+            raise ValueError("Missing 'sections' in result")
+        
+        # Ensure sections is a dict with string values
+        sections = result.get("sections", {})
+        if not isinstance(sections, dict):
+            raise ValueError(f"Expected sections to be dict, got {type(sections)}")
+        
+        # Convert any non-string section values to strings
+        cleaned_sections = {}
+        for key, value in sections.items():
+            if value is None:
+                cleaned_sections[key] = ""
+            elif not isinstance(value, str):
+                cleaned_sections[key] = str(value)
+            else:
+                cleaned_sections[key] = value
+        
         # Run evaluation if requested
         evaluation_results = None
         if request.run_evaluation:
-            evaluator = EvaluationHarness()
-            evaluation_results = evaluator.evaluate_draft(
-                result["sections"],
-                glossary=result.get("glossary", {})
-            ).to_dict()
+            try:
+                evaluator = EvaluationHarness()
+                evaluation_results = evaluator.evaluate_draft(
+                    cleaned_sections,
+                    glossary=result.get("glossary", {})
+                ).to_dict()
+            except Exception as e:
+                print(f"Warning: Evaluation failed: {e}")
+                evaluation_results = None
         
         return AdvancedDraftResponseModel(
             success=True,
             message="Advanced draft generated successfully using 17-step system",
-            sections=result["sections"],
+            sections=cleaned_sections,
             glossary=result.get("glossary", {}),
             outline=result.get("outline"),
             critique_results=result.get("critique_results"),
@@ -865,7 +891,10 @@ async def generate_draft_advanced_endpoint(request: AdvancedDraftRequestModel):
         )
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Advanced draft generation failed: {str(e)}")
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error in generate_draft_advanced: {error_details}")
+        raise HTTPException(status_code=500, detail=f"Advanced draft generation failed: {str(e)}\n\nDetails: {error_details}")
 
 
 

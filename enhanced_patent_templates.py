@@ -21,7 +21,7 @@ REQUIREMENTS:
 
 Example: "Systems and Methods for Detecting Anomalies in Medical Images Using Convolutional Neural Networks with Explainability and Calibration"
 
-Generate ONLY the title, no other text.""",
+CRITICAL: Generate ONLY the title as plain text. Do NOT output JSON, do NOT use quotes, do NOT include any structure. Just the title text.""",
 
     "FIELD": """Generate the FIELD OF THE INVENTION section (2-3 lines, neutral tone).
 
@@ -41,7 +41,7 @@ REQUIREMENTS:
 
 Template: "The disclosure relates to [technical domain] using [key technology] for [primary function], [secondary function], and [tertiary function]."
 
-Generate the FIELD OF THE INVENTION section only.""",
+CRITICAL: Generate ONLY plain text. Do NOT output JSON, do NOT use structured format. Just the section text.""",
 
     "BACKGROUND": """Generate the BACKGROUND OF THE INVENTION section with two paragraphs.
 
@@ -72,7 +72,7 @@ CRITICAL:
 - Use "the disclosure" not "the present invention"
 - Neutral, technical tone throughout
 
-Generate the BACKGROUND OF THE INVENTION section with both paragraphs.""",
+CRITICAL: Generate ONLY plain text paragraphs. Do NOT output JSON, do NOT use structured format. Just the section text with both paragraphs.""",
 
     "SUMMARY": """Generate the BRIEF SUMMARY OF THE INVENTION section structured as 3-5 "aspects."
 
@@ -111,7 +111,7 @@ CRITICAL:
 - Keep high level; no narrowing implementation details
 - Use "the disclosure" not "the present invention"
 
-Generate the BRIEF SUMMARY OF THE INVENTION section.""",
+CRITICAL: Generate ONLY plain text. Do NOT output JSON, do NOT use structured format. Just the section text with "In one aspect..." paragraphs.""",
 
     "DRAWINGS": """Generate the BRIEF DESCRIPTION OF THE DRAWINGS section with consistent numeral scheme.
 
@@ -122,37 +122,20 @@ OUTLINE FIGURES:
 {figures}
 
 REQUIREMENTS:
-Use consistent numeral scheme (100-series system, 200-series method, 300-series UI):
+- Use consistent numeral scheme (100-series system, 200-series method, 300-series UI)
+- Describe 3-5 figures maximum (keep it concise)
+- Each figure description should be 1-2 sentences
+- Format: "FIG. 1 shows [description]." "FIG. 2 illustrates [description]." etc.
+- DO NOT repeat the same information multiple times
+- DO NOT include "In some embodiments" variations for each figure
+- DO NOT include glossary JSON or metadata
 
-FIG. 1 (100-series): System block diagram
-- Acquisition interface (110)
-- Preprocessor (120)
-- CNN module (130)
-- Calibration module (140)
-- Explainer (150)
-- UI (160)
-- Datastore (170)
+Example structure:
+FIG. 1 shows a block diagram of the system architecture.
+FIG. 2 illustrates a flowchart of the method.
+FIG. 3 depicts the user interface components.
 
-FIG. 2 (200-series): Method flow
-- Receive image (210)
-- Normalize/resize (220)
-- Infer (230)
-- Compute anomaly score (240)
-- Calibrate (250)
-- Generate heatmap (260)
-- Decide/route (270)
-- Output report (280)
-
-FIG. 3 (300-series): UI
-- Image pane (310)
-- Heatmap overlay (320)
-- Confidence gauge (330)
-- Threshold control (340)
-- Triage queue (350)
-
-Format: "FIG. N shows [detailed description with numerals]."
-
-Generate the BRIEF DESCRIPTION OF THE DRAWINGS section.""",
+Generate ONLY the BRIEF DESCRIPTION OF THE DRAWINGS section with 3-5 figure descriptions.""",
 
     "DETAILED_DESCRIPTION": """Generate the DETAILED DESCRIPTION OF THE INVENTION section with enablement requirements.
 
@@ -247,7 +230,7 @@ CRITICAL:
 - Use passive/neutral tone
 - Include enablement language: "sufficient detail for a person of ordinary skill in the art to make and use"
 
-Generate the DETAILED DESCRIPTION OF THE INVENTION section with all subsections.""",
+CRITICAL: Generate ONLY plain text paragraphs. Do NOT output JSON, do NOT use structured format. Just the section text with numbered subsections.""",
 
     "CLAIMS": """Generate CLAIMS section with proper structure and antecedent basis.
 
@@ -303,7 +286,7 @@ CRITICAL REQUIREMENTS:
 - NO mixing categories inside one claim (system vs method vs CRM)
 - Every claim noun must be supported in Detailed Description (by paragraph number and figure numeral)
 
-Generate the CLAIMS section with all claims properly formatted.""",
+CRITICAL: Generate ONLY plain text claims. Do NOT output JSON, do NOT use structured format. Just numbered claims like "1. A system..." "2. The system of claim 1..." etc.""",
 
     "ABSTRACT": """Generate the ABSTRACT OF THE DISCLOSURE section.
 
@@ -323,7 +306,7 @@ REQUIREMENTS:
 - No "the present invention"
 - Technical and specific
 
-Generate the ABSTRACT OF THE DISCLOSURE (≤150 words, single paragraph).""",
+CRITICAL: Generate ONLY plain text abstract. Do NOT output JSON, do NOT use structured format. Just a single paragraph of text (≤150 words).""",
 
     "DEFINITIONS": """Generate a DEFINITIONS section.
 
