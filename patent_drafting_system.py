@@ -459,7 +459,20 @@ class TerminologyManager:
 INVENTION DESCRIPTION:
 {invention_description}
 
-For each key term, provide:
+REQUIRED TERMS (must be included):
+- medical image
+- region of interest (ROI)
+- convolutional block
+- anomaly score
+- calibrated confidence value
+- explainability heatmap
+- threshold τ (tau)
+- triage
+- training set
+- validation set
+- domain shift
+
+For each key term (including the required terms above), provide:
 1. Preferred term (standardized)
 2. Definition
 3. Allowed variants (if any)
@@ -1287,6 +1300,60 @@ class AdvancedPatentDraftingSystem:
         
         return text.strip()
     
+    def _apply_language_guard(self, section_name: str, text: str, glossary: Dict[str, Any]) -> str:
+        """Apply section-aware language guard: remove banned phrases, enforce glossary terms."""
+        # Import banned phrases from enhanced templates if available
+        try:
+            from enhanced_patent_templates import GLOBAL_BANNED_PHRASES, SECTION_BANNED_PHRASES
+            global_banned = GLOBAL_BANNED_PHRASES
+            section_banned = SECTION_BANNED_PHRASES.get(section_name.upper(), [])
+            all_banned = global_banned + section_banned
+        except ImportError:
+            # Fallback if enhanced templates not available
+            all_banned = [
+                "the present invention", "revolutionary", "high accuracy", "95%",
+                "more accurate than", "remarkable", "better than", "superior to all"
+            ]
+            section_banned = []
+        
+        # Remove banned phrases (case-insensitive)
+        for phrase in all_banned:
+            # Use word boundaries to avoid partial matches
+            pattern = r'\b' + re.escape(phrase) + r'\b'
+            text = re.sub(pattern, '', text, flags=re.IGNORECASE)
+        
+        # Remove fixed performance numbers (like "95%", "99%", etc.)
+        text = re.sub(r'\b\d+%\s+(?:accuracy|precision|recall)', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'\b(?:achieves?|with|at)\s+\d+%\b', '', text, flags=re.IGNORECASE)
+        
+        # Replace undefined capitalized terms with glossary terms (if glossary available)
+        if glossary and isinstance(glossary, dict):
+            # Get glossary terms (lowercase versions)
+            glossary_terms = {}
+            for term, entry in glossary.items():
+                if isinstance(entry, dict):
+                    term_lower = term.lower()
+                    glossary_terms[term_lower] = term
+                    # Also check allowed variants
+                    if 'allowed_variants' in entry:
+                        for variant in entry.get('allowed_variants', []):
+                            glossary_terms[variant.lower()] = term
+            
+            # Find capitalized terms that might need replacement
+            # This is a simple heuristic - look for capitalized words that aren't at sentence start
+            words = text.split()
+            for i, word in enumerate(words):
+                if i > 0 and word[0].isupper() and word.lower() in glossary_terms:
+                    # Replace with glossary term if it's not at sentence start
+                    words[i] = glossary_terms[word.lower()]
+            text = ' '.join(words)
+        
+        # Clean up double spaces created by removals
+        text = re.sub(r' {2,}', ' ', text)
+        text = re.sub(r'\s+([.,;:])', r'\1', text)  # Remove space before punctuation
+        
+        return text.strip()
+    
     def _remove_repetitive_paragraphs(self, text: str) -> str:
         """Remove repetitive paragraphs, especially 'In some embodiments' ones."""
         paragraphs = text.split('\n\n')
@@ -1507,6 +1574,14 @@ Generate ONLY the refined section text. Do not include glossary, banned phrases 
             
             # Post-process: Fix common issues
             draft_text = self._post_process_section(section_name, draft_text)
+            
+            # Apply language guard: remove banned phrases, enforce glossary
+            draft_text = self._apply_language_guard(
+                section_name, 
+                draft_text, 
+                self.terminology_manager.to_dict()
+            )
+            
             sections[section_name] = draft_text
         
         # Step 8: Claims workbench
