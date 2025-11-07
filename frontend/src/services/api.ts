@@ -133,6 +133,69 @@ export interface DraftResponse {
   success: boolean;
   message: string;
 }
+export interface DraftV2Request {
+  description: string;
+  model?: 'llama3.2:1b' | 'llama3.2:3b' | 'mistral:7b' | 'codellama:7b';
+  template_type?: 'utility' | 'software' | 'medical' | 'design';
+  jurisdiction?: 'USPTO' | 'EPO' | 'WIPO-PCT';
+  claim_bundle?: 'system' | 'method' | 'crm' | 'system+method' | 'method+crm' | 'all';
+  independent_claims_per_type?: number;
+  dependent_claims_per_independent?: number;
+  spec_depth?: 'concise' | 'standard' | 'deep';
+  embodiment_style?: 'narrow' | 'balanced' | 'broad';
+  include_definitions?: boolean;
+  include_alternatives?: boolean;
+  include_figure_callouts?: boolean;
+  include_glossary?: boolean;
+  include_enablement_language?: boolean;
+  include_best_mode?: boolean;
+  include_markush_examples?: boolean;
+  add_boilerplate_variations?: boolean;
+  use_background_search?: boolean;
+  search_mode?: 'tfidf' | 'semantic' | 'hybrid' | 'hybrid-advanced';
+  search_top_k?: number;
+  include_snippets?: boolean;
+  include_metadata?: boolean;
+  use_cache?: boolean;
+  temperature?: number;
+}
+
+export interface DraftV2Response {
+  success: boolean;
+  message: string;
+  model: string;
+  template_type: string;
+  jurisdiction: string;
+  generation_time: number;
+  cached: boolean;
+  abstract: string;
+  full_text_markdown: string;
+  full_text_html: string;
+}
+
+export interface AdvancedDraftRequest {
+  description: string;
+  precision_model?: string;
+  fluency_model?: string;
+  use_ensemble?: boolean;
+  use_scaffolding?: boolean;
+  use_two_pass?: boolean;
+  use_critique?: boolean;
+  run_evaluation?: boolean;
+}
+
+export interface AdvancedDraftResponse {
+  success: boolean;
+  message: string;
+  sections: Record<string, string>;
+  glossary: Record<string, any>;
+  outline?: string;
+  critique_results?: Record<string, any>;
+  evaluation_results?: Record<string, any>;
+  generation_time: number;
+  model_used: Record<string, string>;
+}
+
 
 export interface OllamaHealthResponse {
   status: string;
@@ -193,6 +256,15 @@ export const draftAPI = {
   // Generate patent draft
   generateDraft: async (request: DraftRequest): Promise<DraftResponse> => {
     const response = await api.post('/api/v1/generate_draft', request);
+    return response.data;
+  },
+  generateDraftV2: async (request: DraftV2Request): Promise<DraftV2Response> => {
+    const response = await api.post('/api/v1/generate_draft_v2', request);
+    return response.data;
+  },
+  
+  generateDraftAdvanced: async (request: AdvancedDraftRequest): Promise<AdvancedDraftResponse> => {
+    const response = await api.post('/api/v1/generate_draft_advanced', request);
     return response.data;
   },
 
