@@ -3,7 +3,9 @@
 FastAPI endpoints for Patent NLP Project.
 Enhanced API that uses the centralized search service.
 """
-
+from typing import Literal
+from pydantic import Field
+import re
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, validator, ValidationError
@@ -17,7 +19,9 @@ from search_service import run_search, SearchRequest, format_results_for_api
 from search_utils import generate_snippet, analyze_query_log
 from ollama_service import get_ollama_service
 from async_orchestration import get_orchestration_service, DraftWithSimilarity
-from similarity_visualizer import get_similarity_visualizer
+from patent_drafting_system import get_advanced_drafting_system, AdvancedPatentDraftingSystem
+from evaluation_harness import EvaluationHarness
+# from similarity_visualizer import get_similarity_visualizer
 
 router = APIRouter()
 
@@ -166,6 +170,78 @@ class DraftRequestModel(BaseModel):
         if v > 10000:
             raise ValueError('max_length cannot exceed 10000')
         return v
+# -------------------------------
+# V2 USPTO Draft Models
+# -------------------------------
+Jurisdiction = Literal["USPTO", "EPO", "WIPO-PCT"]
+ClaimBundle = Literal["system", "method", "crm", "system+method", "method+crm", "all"]
+SpecDepth = Literal["concise", "standard", "deep"]
+EmbodimentStyle = Literal["narrow", "balanced", "broad"]
+
+class DraftV2RequestModel(BaseModel):
+    description: str = Field(..., min_length=50, max_length=8000)
+    model: Literal["llama3.2:1b", "llama3.2:3b", "mistral:7b", "codellama:7b"] = "llama3.2:3b"
+    template_type: Literal["utility", "software", "medical", "design"] = "utility"
+    jurisdiction: Jurisdiction = "USPTO"
+    claim_bundle: ClaimBundle = "all"
+    independent_claims_per_type: int = 1
+    dependent_claims_per_independent: int = 3
+    spec_depth: SpecDepth = "deep"
+    embodiment_style: EmbodimentStyle = "balanced"
+    include_definitions: bool = True
+    include_alternatives: bool = True
+    include_figure_callouts: bool = True
+    include_glossary: bool = True
+    include_enablement_language: bool = True
+    include_best_mode: bool = True
+    include_markush_examples: bool = False
+    add_boilerplate_variations: bool = True
+    use_background_search: bool = True
+    search_mode: Literal["tfidf", "semantic", "hybrid", "hybrid-advanced"] = "hybrid"
+    search_top_k: int = 8
+    include_snippets: bool = True
+    include_metadata: bool = True
+    use_cache: bool = True
+    temperature: float = 0.4
+
+
+class DraftV2ResponseModel(BaseModel):
+    success: bool
+    message: str
+    model: str
+    template_type: str
+    jurisdiction: Jurisdiction
+    generation_time: float
+    cached: bool
+    abstract: str
+    full_text_markdown: str
+    full_text_html: str
+
+
+class AdvancedDraftRequestModel(BaseModel):
+    """Request model for advanced 17-step drafting system."""
+    description: str = Field(..., min_length=50, max_length=8000)
+    precision_model: str = "llama3.2:3b"
+    fluency_model: str = "mistral:7b"
+    use_ensemble: bool = True
+    use_scaffolding: bool = True
+    use_two_pass: bool = True
+    use_critique: bool = True
+    run_evaluation: bool = False
+
+
+class AdvancedDraftResponseModel(BaseModel):
+    """Response model for advanced drafting system."""
+    success: bool
+    message: str
+    sections: Dict[str, str]
+    glossary: Dict[str, Any]
+    outline: Optional[str] = None
+    critique_results: Optional[Dict[str, Any]] = None
+    evaluation_results: Optional[Dict[str, Any]] = None
+    generation_time: float
+    model_used: Dict[str, str]
+
 
 
 class DraftResponseModel(BaseModel):
@@ -176,18 +252,6 @@ class DraftResponseModel(BaseModel):
     cached: bool = False
     success: bool = True
     message: str = "Draft generated successfully"
-
-class DraftWithSearchRequestModel(DraftRequestModel):
-    search_mode: str = "semantic"
-    search_top_k: int = 5
-    include_snippets: bool = True
-    include_metadata: bool = True
-
-class DraftWithSearchResponseModel(DraftResponseModel):
-    similar_patents: List[Dict[str, Any]] = []
-    search_mode: str = "semantic"
-    search_top_k: int = 5
-
 
 class DraftWithSearchRequestModel(DraftRequestModel):
     search_mode: str = "semantic"
@@ -679,6 +743,159 @@ async def generate_draft_endpoint(request: DraftRequestModel):
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+    
+
+
+@router.post("/generate_draft_v2", response_model=DraftV2ResponseModel)
+async def generate_draft_v2_endpoint(request: DraftV2RequestModel):
+    """
+    Generate a long-form USPTO-grade patent draft with sections, triple-claim sets,
+    enablement language, figure callouts, and compliance structure.
+    """
+    try:
+        ollama_service = get_ollama_service()
+        if not ollama_service.is_available():
+            raise HTTPException(status_code=503, detail="Ollama service is not available. Please install and start Ollama.")
+
+        # Optional novelty search context
+        novelty_refs = []
+        if request.use_background_search:
+            search_request = SearchRequest(
+                query=request.description,
+                mode=request.search_mode,
+                top_k=request.search_top_k,
+                include_snippets=request.include_snippets,
+                include_metadata=request.include_metadata
+            )
+            results, _ = run_search(search_request)
+            novelty_refs = [r.to_dict() for r in results]
+
+        # Generate full structured USPTO draft
+        result = ollama_service.generate_uspto_structured_draft(
+            description=request.description,
+            model_name=request.model,
+            template_type=request.template_type,
+            jurisdiction=request.jurisdiction,
+            claim_bundle=request.claim_bundle,
+            independent_claims_per_type=request.independent_claims_per_type,
+            dependent_claims_per_independent=request.dependent_claims_per_independent,
+            spec_depth=request.spec_depth,
+            embodiment_style=request.embodiment_style,
+            include_definitions=request.include_definitions,
+            include_alternatives=request.include_alternatives,
+            include_figure_callouts=request.include_figure_callouts,
+            include_glossary=request.include_glossary,
+            include_enablement_language=request.include_enablement_language,
+            include_best_mode=request.include_best_mode,
+            include_markush_examples=request.include_markush_examples,
+            add_boilerplate_variations=request.add_boilerplate_variations,
+            novelty_refs=novelty_refs,
+            temperature=request.temperature,
+            use_cache=request.use_cache
+        )
+
+        # Use the structured output from the upgraded function
+        return DraftV2ResponseModel(
+            success=True,
+            message="USPTO-grade draft generated successfully",
+            model=result.get("model", request.model),
+            template_type=request.template_type,
+            jurisdiction=request.jurisdiction,
+            generation_time=result.get("generation_time", 0.0),
+            cached=result.get("cached", False),
+            abstract=result.get("abstract", ""),
+            full_text_markdown=result.get("full_text_markdown", ""),
+            full_text_html=result.get("full_text_html", "")
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Draft v2 generation failed: {str(e)}")
+
+
+@router.post("/generate_draft_advanced", response_model=AdvancedDraftResponseModel)
+async def generate_draft_advanced_endpoint(request: AdvancedDraftRequestModel):
+    """
+    Generate patent draft using the advanced 17-step system with:
+    - Precision/fluency model ensemble
+    - Decoding profiles (strict/balanced/creative)
+    - Section-by-section templates
+    - Spec scaffolding
+    - Controlled terminology/glossary
+    - Safe language guards
+    - Two-pass drafting
+    - Claims workbench
+    - Self-critique
+    - Final harmonization
+    """
+    try:
+        # Initialize advanced drafting system
+        drafting_system = get_advanced_drafting_system(
+            precision_model=request.precision_model,
+            fluency_model=request.fluency_model
+        )
+        
+        # Generate complete draft
+        result = drafting_system.generate_complete_draft(
+            invention_description=request.description,
+            use_ensemble=request.use_ensemble,
+            use_scaffolding=request.use_scaffolding,
+            use_two_pass=request.use_two_pass,
+            use_critique=request.use_critique
+        )
+        
+        # Validate result structure
+        if not isinstance(result, dict):
+            raise ValueError(f"Expected dict from generate_complete_draft, got {type(result)}")
+        
+        if "sections" not in result:
+            raise ValueError("Missing 'sections' in result")
+        
+        # Ensure sections is a dict with string values
+        sections = result.get("sections", {})
+        if not isinstance(sections, dict):
+            raise ValueError(f"Expected sections to be dict, got {type(sections)}")
+        
+        # Convert any non-string section values to strings
+        cleaned_sections = {}
+        for key, value in sections.items():
+            if value is None:
+                cleaned_sections[key] = ""
+            elif not isinstance(value, str):
+                cleaned_sections[key] = str(value)
+            else:
+                cleaned_sections[key] = value
+        
+        # Run evaluation if requested
+        evaluation_results = None
+        if request.run_evaluation:
+            try:
+                evaluator = EvaluationHarness()
+                evaluation_results = evaluator.evaluate_draft(
+                    cleaned_sections,
+                    glossary=result.get("glossary", {})
+                ).to_dict()
+            except Exception as e:
+                print(f"Warning: Evaluation failed: {e}")
+                evaluation_results = None
+        
+        return AdvancedDraftResponseModel(
+            success=True,
+            message="Advanced draft generated successfully using 17-step system",
+            sections=cleaned_sections,
+            glossary=result.get("glossary", {}),
+            outline=result.get("outline"),
+            critique_results=result.get("critique_results"),
+            evaluation_results=evaluation_results,
+            generation_time=result.get("generation_time", 0.0),
+            model_used=result.get("model_used", {})
+        )
+        
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error in generate_draft_advanced: {error_details}")
+        raise HTTPException(status_code=500, detail=f"Advanced draft generation failed: {str(e)}\n\nDetails: {error_details}")
+
 
 
 @router.post("/generate_draft_with_similarity", response_model=DraftWithSimilarityResponseModel)
@@ -919,52 +1136,6 @@ async def pull_model(model_name: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/generate_with_search", response_model=DraftWithSearchResponseModel)
-async def generate_with_search_endpoint(request: DraftWithSearchRequestModel):
-    """Generate a patent draft and find similar patents based on claims."""
-    # Generate the draft
-    draft_result = await generate_draft_endpoint(request)
-    
-    # Extract claims (you'll need to implement this function)
-    claims = extract_claims_from_draft(draft_result.draft)
-    
-    if not claims:
-        return {
-            **draft_result.dict(),
-            "similar_patents": [],
-            "search_mode": request.search_mode,
-            "search_top_k": request.search_top_k,
-            "message": "No claims found in the generated draft"
-        }
-    
-    # Search for similar patents
-    search_results = []
-    for claim in claims:
-        search_request = SearchRequest(
-            query=claim,
-            mode=request.search_mode,
-            top_k=request.search_top_k,
-            include_snippets=request.include_snippets,
-            include_metadata=request.include_metadata
-        )
-        results, _ = run_search(search_request)
-        search_results.extend([r.to_dict() for r in results])
-    
-    # Deduplicate results by doc_id
-    seen = set()
-    unique_results = []
-    for result in search_results:
-        if result['doc_id'] not in seen:
-            seen.add(result['doc_id'])
-            unique_results.append(result)
-    
-    return {
-        **draft_result.dict(),
-        "similar_patents": unique_results[:request.search_top_k],
-        "search_mode": request.search_mode,
-        "search_top_k": request.search_top_k
-    }
-
 def extract_claims_from_draft(draft: str) -> List[str]:
     """Extract claims from the generated draft text."""
     # This is a simple implementation - you may need to adjust based on your draft format
@@ -1020,8 +1191,8 @@ async def generate_draft_with_visualization_endpoint(request: DraftWithSearchReq
             print(f"DEBUG: First patent: {similar_patents[0]}")
         
         # Perform similarity visualization
-        visualizer = get_similarity_visualizer()
-        similarity_report = visualizer.generate_similarity_report(draft_result.draft, similar_patents)
+        # visualizer = get_similarity_visualizer()
+        # similarity_report = visualizer.generate_similarity_report(draft_result.draft, similar_patents)
         
         # Convert to response models
         highlighted_sections = {}
