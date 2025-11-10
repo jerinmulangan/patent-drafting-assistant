@@ -48,15 +48,19 @@ async def root():
         "docs": "/docs",
         "endpoints": {
             "search": "/api/v1/search",
-            "summarize": "/api/v1/summarize", 
+            "summarize": "/api/v1/summarize",
             "batch_search": "/api/v1/batch_search",
             "compare_modes": "/api/v1/compare_modes",
             "generate_draft": "/api/v1/generate_draft",
+            "generate_draft_v2": "/api/v1/generate_draft_v2",            # <-- add
             "generate_draft_with_similarity": "/api/v1/generate_draft_with_similarity",
             "generate_with_search": "/api/v1/generate_with_search",
             "generate_draft_with_visualization": "/api/v1/generate_draft_with_visualization",
+            "ollama_health": "/api/v1/ollama/health",                     # <-- add
+            "ollama_models": "/api/v1/ollama/models",                     # <-- add
+            "ollama_pull_model": "/api/v1/ollama/pull_model?model_name=", # <-- add
             "logs_analyze": "/api/v1/logs/analyze",
-            "health": "/api/v1/health"
+            "health": "/api/v1/health",
         }
     }
 
