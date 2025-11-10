@@ -6,7 +6,7 @@ Based on user feedback for §101/§112 compliance and enablement requirements.
 
 # Enhanced section-specific prompt templates
 ENHANCED_SECTION_PROMPTS = {
-    "TITLE OF THE INVENTION": """Generate a complete, grammatical, tech-specific title for this invention.
+    "TITLE OF THE INVENTION": """Generate ONLY the title of the invention. Nothing else.
 
 INVENTION DESCRIPTION:
 {description}
@@ -16,40 +16,40 @@ REQUIREMENTS:
 - Grammatically correct
 - Modality-agnostic where possible
 - Names the ML/technical approach
-- Neutral, functional language (NO superlatives like "High Accuracy" or "Explanatory Capabilities")
+- Neutral, functional language (NO superlatives)
 - Format: "Systems and Methods for [Core Function] Using [Technical Approach] with [Neutral Differentiators]"
 
 Example: "Systems and Methods for Detecting Anomalies in Medical Images Using Convolutional Neural Networks with Calibrated Confidence and Visual Explanations"
 
 BANNED PHRASES IN TITLE:
 - "High Accuracy"
-- "Explanatory Capabilities" (use "Visual Explanations" instead)
+- "Explanatory Capabilities"
 - "Remarkable"
 - "Revolutionary"
 - Any performance claims or superlatives
 - Fixed numbers like "95%"
 
-CRITICAL: Generate ONLY the title as plain text. Do NOT output JSON, do NOT use quotes, do NOT include any structure. Just the title text.""",
+CRITICAL: Generate ONLY the title text. NO other text. NO description. NO explanation. NO "A calibrated confidence value may be derived..." or any other disclosure text. Just the title itself.""",
 
-    "FIELD": """Generate the FIELD OF THE INVENTION section (2-3 lines, neutral tone).
+    "FIELD": """Generate the FIELD OF THE INVENTION section (2-3 sentences, neutral tone).
 
 INVENTION DESCRIPTION:
 {description}
 
-GLOSSARY:
-{glossary}
-
 REQUIREMENTS:
-- 2-3 sentences maximum
+- 2-3 sentences MAXIMUM
 - Neutral, technical language
 - Use "the disclosure" instead of "the present invention"
 - Be specific about technical domain
-- No superiority claims
-- No admissions
+- NO superiority claims
+- NO admissions
+- NO glossary in this section (glossary goes in separate section)
+- NO summary content
+- NO "In some embodiments" paragraphs
 
 Template: "The disclosure relates to [technical domain] using [key technology] for [primary function], [secondary function], and [tertiary function]."
 
-CRITICAL: Generate ONLY plain text. Do NOT output JSON, do NOT use structured format. Just the section text.""",
+CRITICAL: Generate ONLY 2-3 sentences. Do NOT include glossary, summary, or embodiments. Just the field description.""",
 
     "BACKGROUND": """Generate the BACKGROUND OF THE INVENTION section with two short paragraphs.
 
@@ -76,12 +76,14 @@ Paragraph 2 - Technical Pain Points (2-3 sentences):
 - Use technical, neutral language
 - NO comparative claims
 
-End with: "Accordingly, there is a need for techniques that provide [key features] with [differentiators] and robust performance across [relevant domains]."
+End with: "Accordingly, there is a need for systems and methods that provide calibrated confidence and explainable anomaly detection for medical images."
 
 CRITICAL:
 - NO superiority claims
 - NO admissions about prior art
 - NO external citations or pseudo-references
+- NO figure references (Background cannot reference your own figures - e.g., "FIG. 1 illustrates..." is FORBIDDEN)
+- NO subjective language ("have shown promise", "impressive", "demonstrated")
 - NO hype or marketing language
 - Use "the disclosure" not "the present invention"
 - Neutral, technical tone throughout
@@ -89,7 +91,7 @@ CRITICAL:
 
 CRITICAL: Generate ONLY plain text paragraphs. Do NOT output JSON, do NOT use structured format. Just the section text with both paragraphs.""",
 
-    "SUMMARY": """Generate the BRIEF SUMMARY OF THE INVENTION section structured as 3-5 "aspects."
+    "SUMMARY": """Generate the BRIEF SUMMARY OF THE INVENTION section as 4-6 distinct paragraphs.
 
 INVENTION DESCRIPTION:
 {description}
@@ -101,32 +103,42 @@ OUTLINE:
 {outline}
 
 REQUIREMENTS:
-Structure as "In one aspect..." paragraphs:
+Structure as 4-6 distinct paragraphs (NOT repeating Field content):
 
-Aspect 1 - System:
-- Ingestion → preprocessing → CNN backbone → anomaly head → calibration → UI with heatmap + thresholding
-- High level, no narrowing implementation details
+Paragraph 1 - Broad Overview:
+- Functional description of what the disclosure provides
+- High-level system capabilities
+- NO performance claims
 
-Aspect 2 - Method:
-- Training with class-imbalanced loss, augmentation, domain adaptation
-- Inference with confidence calibration
-- High level description
+Paragraph 2 - System Embodiment:
+- System components and their functions
+- Acquisition → preprocessing → CNN → calibration → explainability → UI
+- Functional only
 
-Aspect 3 - Computer-Readable Medium:
-- Instructions to perform the method
+Paragraph 3 - Method Embodiment:
+- Method steps for anomaly detection
+- Training and inference processes
+- Functional only
 
-Aspect 4 - Variants (optional):
-- Single-view vs multi-view
-- On-device vs cloud
-- Active learning loop
+Paragraph 4 - Variations (Training/Calibration/Triage):
+- Training approaches (class-imbalanced loss, augmentation, domain adaptation)
+- Calibration methods
+- Triage functionality
+
+Paragraph 5 - Hardware Environment (optional):
+- Deployment options (on-device vs cloud)
+- Hardware requirements
 
 CRITICAL:
+- Do NOT repeat Field content
 - Use open-ended ranges, not single-point values
 - Avoid narrowing language: "must", "only", "always", "essential"
 - Keep high level; no narrowing implementation details
 - Use "the disclosure" not "the present invention"
+- NO performance claims, NO accuracy numbers, NO metrics
+- Functional description only - what it does, not how well
 
-CRITICAL: Generate ONLY plain text. Do NOT output JSON, do NOT use structured format. Just the section text with "In one aspect..." paragraphs.""",
+CRITICAL: Generate ONLY plain text. Do NOT output JSON, do NOT use structured format. Just 4-6 distinct paragraphs.""",
 
     "DRAWINGS": """Generate the BRIEF DESCRIPTION OF THE DRAWINGS section with consistent numeral scheme.
 
@@ -137,22 +149,29 @@ OUTLINE FIGURES:
 {figures}
 
 REQUIREMENTS:
-- Use consistent numeral scheme matching the Detailed Description:
-  - 100-series for system components
-  - 200-series for method steps
-  - 300-series for UI components
-- Describe exactly 3 figures with specific numerals:
-  - FIG. 1: system block diagram (100-series: acquisition 110, preprocessing 120, CNN 130, calibration 140, explainer 150, UI 160, datastore 170)
-  - FIG. 2: method flow (200-series: receive 210, normalize 220, infer 230, anomaly score 240, calibrate 250, heatmap 260, triage 270, output 280)
+- Use CONSISTENT numeral scheme (use each number exactly once):
+  - 100: System overall
+  - 110: Acquisition Interface
+  - 120: Preprocessing Module
+  - 130: CNN Module
+  - 140: Calibration Module
+  - 150: Explainability Module
+  - 160: User Interface
+  - 170: Data Store
+  - 180: Triage Module (if applicable)
+- Describe exactly 3 figures:
+  - FIG. 1: system block diagram showing elements 100, 110, 120, 130, 140, 150, 160, 170
+  - FIG. 2: method flow diagram (200-series: receive 210, normalize 220, infer 230, anomaly score 240, calibrate 250, heatmap 260, triage 270, output 280)
   - FIG. 3: UI components (300-series: image pane 310, heatmap overlay 320, confidence gauge 330, threshold control 340, triage queue 350)
 - Each figure description should be 1-2 sentences
-- Format: "FIG. 1 shows [description with numerals]." "FIG. 2 illustrates [description with numerals]." etc.
-- Reference the specific numerals (100, 110, 120, etc.) that will be used in Detailed Description
+- Format: "FIG. 1 shows [description]." "FIG. 2 illustrates [description]." etc.
+- Reference numerals consistently (e.g., "element 110", "element 120" - use same format throughout)
 - DO NOT repeat the same information multiple times
-- DO NOT include "In some embodiments" variations for each figure
-- DO NOT include glossary JSON or metadata
+- DO NOT include "In some embodiments" variations
+- DO NOT include "DETAILED DESCRIPTION OF THE DRAWINGS" subsection
+- DO NOT mix numbering schemes (don't use "ROI 120" if 120 is preprocessing module)
 
-CRITICAL: Generate ONLY plain text figure descriptions. Do NOT output JSON, do NOT use structured format. Just the BRIEF DESCRIPTION OF THE DRAWINGS section with 3 figure descriptions.""",
+CRITICAL: Generate ONLY plain text figure descriptions. Do NOT output JSON, do NOT use structured format. Just 3 figure descriptions with consistent numerals.""",
 
     "DETAILED_DESCRIPTION": """Generate the DETAILED DESCRIPTION OF THE INVENTION section with enablement requirements.
 
@@ -233,20 +252,17 @@ Required Subsections (numbered, with figure references):
    - PHI handling: de-identification requirements
    - Logging: no PHI in logs
 
-10. Worked Examples (at least two, step-by-step)
+10. Worked Examples (at least one, step-by-step)
     - Example 1: Chest X-ray pneumothorax triage
-      * Input: chest X-ray image (specify dimensions)
-      * Preprocessing: normalization method, resizing
-      * Inference: CNN forward pass, anomaly score
-      * Calibration: calibrated confidence value
-      * Heatmap: explainability visualization
-      * Triage: routing decision based on threshold
-    - Example 2: Brain MRI anomaly localization with multi-slice fusion
-      * Input: multi-slice MRI stack
-      * Preprocessing: per-slice normalization
-      * Inference: per-slice scores, fusion method
-      * Calibration and heatmap generation
-      * Triage decision
+      * Input: chest X-ray image (dimensions in range 512-2048 pixels)
+      * Preprocessing: normalization (z-score or min-max), resizing to target size
+      * Inference: CNN forward pass with kernel sizes 3×3 to 7×7, stride 1-2, depth 8-200 layers
+      * Anomaly score: numerical value in range [0, 1]
+      * Calibration: temperature scaling or isotonic regression on held-out validation set
+      * Calibrated confidence value: adjusted score accounting for model biases
+      * Heatmap: explainability visualization using Grad-CAM or Integrated Gradients, scaled 0-255
+      * Triage: routing decision based on threshold τ in range [0.1, 0.9]
+      * Output: medical image displayed with heatmap overlay and confidence gauge, routed to urgent or normal queue
 
 11. Support Map Paragraph
     - Explicit mapping: "The [claim term] of claim X refers to [paragraph Y] and FIG. Z"
@@ -372,27 +388,32 @@ GLOSSARY:
 {glossary}
 
 REQUIREMENTS:
-- Exactly ≤150 words (count carefully)
+- Exactly ≤150 words (count carefully - trim if over)
 - Single paragraph
-- Focus on WHAT IT DOES (functional pipeline), NOT how well it performs
+- Focus on WHAT IT DOES (functional pipeline), NOT how it's trained
 - Include: "calibrated confidence value" + "explainability heatmap" + "triage"
 - Describe the functional steps: receiving image → preprocessing → CNN inference → calibration → heatmap generation → display/triage
 - NO legalese
 - NO limitations
 - NO "the present invention"
+- NO "novel" (subjective)
 - NO performance claims or numbers
 - NO comparative language ("better than", "more accurate")
+- NO training/validation set details (focus on what it does, not how it's trained)
 - Technical and specific, but functional only
 
 BANNED IN ABSTRACT:
+- "novel"
 - "high accuracy"
 - "95%"
 - "more accurate than"
 - "remarkable"
 - "revolutionary"
+- "training set"
+- "validation set"
 - Any superlatives or performance claims
 
-CRITICAL: Generate ONLY plain text abstract. Do NOT output JSON, do NOT use structured format. Just a single paragraph of text (≤150 words).""",
+CRITICAL: Generate ONLY plain text abstract. Do NOT output JSON, do NOT use structured format. Just a single paragraph of text (≤150 words). Count words and trim if necessary.""",
 
     "DEFINITIONS": """Generate a DEFINITIONS section.
 
