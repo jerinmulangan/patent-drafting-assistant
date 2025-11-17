@@ -17,7 +17,7 @@ from pathlib import Path
 from ollama_service import get_ollama_service
 from search_service import run_search, SearchRequest, SearchResult
 from search_utils import load_patent_metadata
-from section_similarity_analyzer import SectionSimilarityAnalyzer, get_section_similarity_map
+from section_similarity_analyzer import SectionSimilarityAnalyzer, get_section_similarity_map, SectionSimilarityResult
 
 
 @dataclass
@@ -98,7 +98,8 @@ class AsyncOrchestrationService:
                 search_results,
                 search_mode,
                 top_k,
-                include_snippets
+                include_snippets,
+                original_prompt=prompt  # Pass original prompt for fallback
             )
             
             total_time = time.time() - start_time
@@ -178,7 +179,8 @@ class AsyncOrchestrationService:
         search_results: Tuple[List[SearchResult], Dict[str, Any]],
         search_mode: str,
         top_k: int,
-        include_snippets: bool
+        include_snippets: bool,
+        original_prompt: str = None
     ) -> Dict[str, SectionSimilarity]:
         """Analyze similarity for each section of the generated draft."""
         # Use the dedicated section analyzer
@@ -188,6 +190,44 @@ class AsyncOrchestrationService:
             top_k=top_k,
             include_snippets=include_snippets
         )
+        
+        # If no sections were found, do a general search using the original prompt
+        # This ensures we always return similarity results like the prior art system
+        if not section_results or len(section_results) == 0:
+            print("Warning: No sections parsed from draft, performing general similarity search on description")
+            start_time = time.time()
+            
+            # Use original prompt if available, otherwise use first part of draft
+            query = original_prompt if original_prompt else draft[:1000]
+            general_results, _ = await self._search_patents_async(
+                query,
+                search_mode,
+                top_k,
+                include_snippets
+            )
+            analysis_time = time.time() - start_time
+            
+            # Convert search results to similarity format
+            similar_patents = []
+            for result in general_results:
+                similar_patents.append({
+                    "patent_id": result.doc_id,
+                    "title": result.title,
+                    "similarity_score": result.score if result.score else 0.0,
+                    "doc_type": result.doc_type,
+                    "snippet": result.snippet if include_snippets else "",
+                    "source_file": result.source_file if hasattr(result, 'source_file') else None
+                })
+            
+            # Return a single "General" section with results
+            section_results["general"] = SectionSimilarityResult(
+                section_name="Prior Art Search",
+                section_text=query[:500] + "..." if len(query) > 500 else query,
+                similar_patents=similar_patents,
+                analysis_time=analysis_time,
+                patent_count=len(similar_patents),
+                top_similarity_score=similar_patents[0]["similarity_score"] if similar_patents else 0.0
+            )
         
         # Convert to SectionSimilarity format for compatibility
         section_similarities = {}
