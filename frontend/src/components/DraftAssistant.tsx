@@ -7,10 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Alert } from './ui/Alert';
 import { Badge } from './ui/Badge';
 import { draftAPI, DraftRequest, DraftResponse, OllamaHealthResponse } from '../services/api';
-import { DraftV2Request, DraftV2Response, AdvancedDraftRequest, AdvancedDraftResponse } from '../services/api';
-const USE_ADVANCED = true; // Use new 17-step advanced system
-const USE_V2 = false; // Fallback to v2 if advanced fails
+import { DraftV2Request, DraftV2Response, AdvancedDraftRequest, AdvancedDraftResponse, DraftWithSimilarityRequest, DraftWithSimilarityResponse } from '../services/api';
 
+type GenerationMode = 'basic' | 'advanced' | 'similarity';
 
 const DraftAssistant: React.FC = () => {
   const [description, setDescription] = useState('');
@@ -22,6 +21,8 @@ const DraftAssistant: React.FC = () => {
   const [ollamaStatus, setOllamaStatus] = useState<OllamaHealthResponse | null>(null);
   const [generationTime, setGenerationTime] = useState<number | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [generationMode, setGenerationMode] = useState<GenerationMode>('advanced');
+  const [similarityResults, setSimilarityResults] = useState<DraftWithSimilarityResponse | null>(null);
 
   // Check Ollama status on component mount
   useEffect(() => {
@@ -45,99 +46,99 @@ const DraftAssistant: React.FC = () => {
   };
 
   const handleGenerate = async () => {
-  if (!description.trim()) { setError('Please enter an invention description'); return; }
-  if (description.trim().length < 50) { setError('Description must be at least 50 characters long'); return; }
+    if (!description.trim()) { setError('Please enter an invention description'); return; }
+    if (description.trim().length < 50) { setError('Description must be at least 50 characters long'); return; }
 
-  setIsLoading(true);
-  setError(null);
-  setGenerationTime(null);
+    setIsLoading(true);
+    setError(null);
+    setGenerationTime(null);
+    setSimilarityResults(null);
 
-  try {
-    if (USE_ADVANCED) {
-      // --- Advanced 17-step system ---
-      const req: AdvancedDraftRequest = {
-        description: description.trim(),
-        precision_model: selectedModel,
-        fluency_model: selectedModel === 'llama3.2:3b' ? 'mistral:7b' : 'llama3.2:3b',
-        use_ensemble: true,
-        use_scaffolding: true,
-        use_two_pass: true,
-        use_critique: true,
-        run_evaluation: false
-      };
-      const res: AdvancedDraftResponse = await draftAPI.generateDraftAdvanced(req);
-      
-      // Convert sections to markdown format for display
-      const sections = res.sections || {};
-      const markdownParts: string[] = [];
-      
-      // Order sections properly
-      const sectionOrder = [
-        'TITLE OF THE INVENTION',
-        'CROSS-REFERENCE TO RELATED APPLICATIONS',
-        'FIELD OF THE INVENTION',
-        'BACKGROUND OF THE INVENTION',
-        'BRIEF SUMMARY OF THE INVENTION',
-        'BRIEF DESCRIPTION OF THE DRAWINGS',
-        'DETAILED DESCRIPTION OF THE INVENTION',
-        'CLAIMS',
-        'ABSTRACT OF THE DISCLOSURE'
-      ];
-      
-      for (const sectionName of sectionOrder) {
-        if (sections[sectionName]) {
-          markdownParts.push(`## ${sectionName}\n\n${sections[sectionName]}`);
+    try {
+      if (generationMode === 'similarity') {
+        // --- Draft with Similarity ---
+        const req: DraftWithSimilarityRequest = {
+          description: description.trim(),
+          model: selectedModel,
+          template_type: templateType,
+          search_mode: 'hybrid',
+          top_k: 5,
+          include_snippets: true,
+          use_cache: true
+        };
+        const res: DraftWithSimilarityResponse = await draftAPI.generateDraftWithSimilarity(req);
+        console.log('Similarity response:', res);
+        console.log('Section similarities:', res.section_similarities);
+        setDraft(res.draft);
+        setGenerationTime(res.generation_time);
+        setSimilarityResults(res);
+      } else if (generationMode === 'advanced') {
+        // --- Advanced 17-step system ---
+        const req: AdvancedDraftRequest = {
+          description: description.trim(),
+          precision_model: selectedModel,
+          fluency_model: selectedModel === 'llama3.2:3b' ? 'mistral:7b' : 'llama3.2:3b',
+          use_ensemble: true,
+          use_scaffolding: true,
+          use_two_pass: true,
+          use_critique: true,
+          run_evaluation: false
+        };
+        const res: AdvancedDraftResponse = await draftAPI.generateDraftAdvanced(req);
+        
+        // Convert sections to markdown format for display
+        const sections = res.sections || {};
+        const markdownParts: string[] = [];
+        
+        // Order sections properly
+        const sectionOrder = [
+          'TITLE OF THE INVENTION',
+          'CROSS-REFERENCE TO RELATED APPLICATIONS',
+          'FIELD OF THE INVENTION',
+          'BACKGROUND OF THE INVENTION',
+          'BRIEF SUMMARY OF THE INVENTION',
+          'BRIEF DESCRIPTION OF THE DRAWINGS',
+          'DETAILED DESCRIPTION OF THE INVENTION',
+          'CLAIMS',
+          'ABSTRACT OF THE DISCLOSURE'
+        ];
+        
+        for (const sectionName of sectionOrder) {
+          if (sections[sectionName]) {
+            markdownParts.push(`## ${sectionName}\n\n${sections[sectionName]}`);
+          }
         }
-      }
-      
-      // Add any other sections
-      for (const [sectionName, content] of Object.entries(sections)) {
-        if (!sectionOrder.includes(sectionName)) {
-          markdownParts.push(`## ${sectionName}\n\n${content}`);
+        
+        // Add any other sections
+        for (const [sectionName, content] of Object.entries(sections)) {
+          if (!sectionOrder.includes(sectionName)) {
+            markdownParts.push(`## ${sectionName}\n\n${content}`);
+          }
         }
+        
+        setDraft(markdownParts.join('\n\n'));
+        setGenerationTime(res.generation_time);
+      } else {
+        // --- Basic draft (legacy v1) ---
+        const req: DraftRequest = {
+          description: description.trim(),
+          model: selectedModel,
+          template_type: templateType,
+          max_length: 2000
+        };
+        const res: DraftResponse = await draftAPI.generateDraft(req);
+        setDraft(res.draft);
+        setGenerationTime(res.generation_time);
       }
-      
-      setDraft(markdownParts.join('\n\n'));
-      setGenerationTime(res.generation_time);
-    } else if (USE_V2) {
-      // --- V2 call, minimal fields ---
-      const req: DraftV2Request = {
-        description: description.trim(),
-        model: selectedModel as DraftV2Request['model'],
-        template_type: templateType as DraftV2Request['template_type'],
-        jurisdiction: 'USPTO',
-        claim_bundle: 'all',
-        spec_depth: 'deep',
-        embodiment_style: 'balanced',
-        include_definitions: true,
-        include_figure_callouts: true,
-        include_enablement_language: true,
-      };
-      const res: DraftV2Response = await draftAPI.generateDraftV2(req);
-      // map v2 -> your existing UI (string draft)
-      setDraft(res.full_text_markdown || res.full_text_html || '');
-      setGenerationTime(res.generation_time);
-    } else {
-      // --- legacy v1 (unchanged) ---
-      const req: DraftRequest = {
-        description: description.trim(),
-        model: selectedModel,
-        template_type: templateType,
-        max_length: 2000
-      };
-      const res: DraftResponse = await draftAPI.generateDraft(req);
-      setDraft(res.draft);
-      setGenerationTime(res.generation_time);
+    } catch (err: any) {
+      console.error('Draft generation error:', err);
+      if (err.response?.status === 503) setError('Ollama service is not available. Please install and start Ollama.');
+      else if (err.response?.status === 400) setError(err.response.data.detail || 'Invalid request parameters');
+      else setError('Failed to generate draft. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
-  } catch (err: any) {
-    console.error('Draft generation error:', err);
-    if (err.response?.status === 503) setError('Ollama service is not available. Please install and start Ollama.');
-    else if (err.response?.status === 400) setError(err.response.data.detail || 'Invalid request parameters');
-    else setError('Failed to generate draft. Please try again.');
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
 
   const downloadDraft = () => {
@@ -276,8 +277,52 @@ context-aware patent application drafts.`;
               </p>
             </div>
 
-            {/* Advanced Options */}
+            {/* Generation Mode Selection */}
             <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Generation Mode
+                </label>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <button
+                    type="button"
+                    onClick={() => setGenerationMode('basic')}
+                    className={`p-3 rounded-lg border-2 transition-all ${
+                      generationMode === 'basic'
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="text-sm font-medium text-gray-900">Basic</div>
+                    <div className="text-xs text-gray-500 mt-1">Standard generation</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGenerationMode('advanced')}
+                    className={`p-3 rounded-lg border-2 transition-all ${
+                      generationMode === 'advanced'
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="text-sm font-medium text-gray-900">Advanced</div>
+                    <div className="text-xs text-gray-500 mt-1">17-step system</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGenerationMode('similarity')}
+                    className={`p-3 rounded-lg border-2 transition-all ${
+                      generationMode === 'similarity'
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="text-sm font-medium text-gray-900">With Similarity</div>
+                    <div className="text-xs text-gray-500 mt-1">Prior art matches</div>
+                  </button>
+                </div>
+              </div>
+
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-medium text-gray-700">Advanced Options</h3>
                 <Button
@@ -392,6 +437,70 @@ context-aware patent application drafts.`;
                     {draft}
                   </div>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Similarity Results */}
+        {similarityResults && similarityResults.section_similarities && Object.keys(similarityResults.section_similarities).length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Prior Art Matches
+              </CardTitle>
+              <CardDescription>
+                Similar patents found for each section. Analysis time: {similarityResults.total_analysis_time.toFixed(2)}s
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {Object.entries(similarityResults.section_similarities).map(([sectionName, similarity]) => (
+                  <div key={sectionName} className="rounded-lg border border-gray-200 p-4">
+                    <h4 className="font-semibold text-gray-900 mb-2">{similarity.section_name || sectionName}</h4>
+                    <p className="text-sm text-gray-600 mb-3">
+                      Found {similarity.patent_count || (similarity.similar_patents?.length || 0)} similar patent{(similarity.patent_count || (similarity.similar_patents?.length || 0)) !== 1 ? 's' : ''} 
+                      {' '}({similarity.analysis_time?.toFixed(2) || '0.00'}s)
+                    </p>
+                    {similarity.similar_patents && similarity.similar_patents.length > 0 ? (
+                      <div className="space-y-2">
+                        {similarity.similar_patents.slice(0, 3).map((patent, idx) => (
+                          <div key={idx} className="text-sm bg-gray-50 p-3 rounded border border-gray-100">
+                            <div className="font-medium text-gray-900">{patent.title || `Patent ${patent.patent_id}`}</div>
+                            <div className="text-xs text-gray-500 mt-1">ID: {patent.patent_id}</div>
+                            {patent.snippet && (
+                              <div className="text-xs text-gray-600 mt-2 line-clamp-2">{patent.snippet}</div>
+                            )}
+                            {patent.similarity_score !== undefined && (
+                              <div className="text-xs text-gray-500 mt-1">Score: {patent.similarity_score.toFixed(3)}</div>
+                            )}
+                            {patent.doc_type && (
+                              <div className="text-xs text-gray-500 mt-1">Type: {patent.doc_type}</div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-500 italic">No similar patents found for this section.</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        {similarityResults && (!similarityResults.section_similarities || Object.keys(similarityResults.section_similarities).length === 0) && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Prior Art Matches
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-sm text-gray-500">
+                No section similarities available. The draft may not have been parsed into sections, or similarity analysis may have failed.
               </div>
             </CardContent>
           </Card>

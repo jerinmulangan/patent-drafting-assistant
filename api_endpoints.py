@@ -829,7 +829,7 @@ async def generate_draft_advanced_endpoint(request: AdvancedDraftRequestModel):
     """
     try:
         # Initialize advanced drafting system
-        drafting_system = get_advanced_drafting_system(
+        drafting_system: AdvancedPatentDraftingSystem = get_advanced_drafting_system(
             precision_model=request.precision_model,
             fluency_model=request.fluency_model
         )
@@ -916,7 +916,7 @@ async def generate_draft_with_similarity_endpoint(request: DraftWithSimilarityRe
             )
         
         # Generate draft with background search
-        result = await orchestration_service.generate_with_background_search(
+        result: DraftWithSimilarity = await orchestration_service.generate_with_background_search(
             prompt=request.description,
             search_mode=request.search_mode,
             model_name=request.model,

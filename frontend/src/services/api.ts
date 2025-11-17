@@ -211,6 +211,45 @@ export interface OllamaModelsResponse {
   total_models: number;
 }
 
+export interface DraftWithSimilarityRequest {
+  description: string;
+  search_mode?: 'tfidf' | 'semantic' | 'hybrid' | 'hybrid-advanced';
+  model?: string;
+  template_type?: string;
+  top_k?: number;
+  include_snippets?: boolean;
+  use_cache?: boolean;
+}
+
+export interface SimilarPatent {
+  patent_id: string;
+  title?: string;
+  similarity_score: number;
+  doc_type?: string;
+  snippet?: string;
+  source_file?: string;
+}
+
+export interface SectionSimilarity {
+  section_name: string;
+  section_text: string;
+  similar_patents: SimilarPatent[];
+  analysis_time: number;
+  patent_count: number;
+}
+
+export interface DraftWithSimilarityResponse {
+  draft: string;
+  model: string;
+  template_type: string;
+  generation_time: number;
+  cached: boolean;
+  section_similarities: Record<string, SectionSimilarity>;
+  total_analysis_time: number;
+  success: boolean;
+  message: string;
+}
+
 // API functions
 export const searchAPI = {
   // Basic search
@@ -265,6 +304,11 @@ export const draftAPI = {
   
   generateDraftAdvanced: async (request: AdvancedDraftRequest): Promise<AdvancedDraftResponse> => {
     const response = await api.post('/api/v1/generate_draft_advanced', request);
+    return response.data;
+  },
+
+  generateDraftWithSimilarity: async (request: DraftWithSimilarityRequest): Promise<DraftWithSimilarityResponse> => {
+    const response = await api.post('/api/v1/generate_draft_with_similarity', request);
     return response.data;
   },
 
