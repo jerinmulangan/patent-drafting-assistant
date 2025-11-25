@@ -157,14 +157,22 @@ class AsyncOrchestrationService:
         """Search patents asynchronously."""
         loop = asyncio.get_event_loop()
         
-        # Create search request
+        # Create search request with stricter matching parameters
+        # For hybrid-advanced, use higher semantic weight for better meaning-based matching
+        semantic_weight = 0.8 if search_mode == 'hybrid-advanced' else 0.7
+        tfidf_weight = 0.2 if search_mode == 'hybrid-advanced' else 0.3
+        
         request = SearchRequest(
             query=query,
             mode=search_mode,
             top_k=top_k,
             include_snippets=include_snippets,
             include_metadata=True,
-            log_enabled=False
+            log_enabled=False,
+            rerank=True,  # Enable reranking for stricter relevance
+            semantic_weight=semantic_weight,
+            tfidf_weight=tfidf_weight if search_mode == 'hybrid-advanced' else None,
+            alpha=0.3 if search_mode == 'hybrid' else None  # Favor semantic for hybrid
         )
         
         return await loop.run_in_executor(
@@ -198,26 +206,38 @@ class AsyncOrchestrationService:
             start_time = time.time()
             
             # Use original prompt if available, otherwise use first part of draft
+            # Prefer original prompt as it's more focused on user's actual invention
             query = original_prompt if original_prompt else draft[:1000]
+            
+            # Search with more candidates to filter to top_k with stricter matching
+            search_candidates = top_k * 2  # Get 2x candidates for filtering
             general_results, _ = await self._search_patents_async(
                 query,
                 search_mode,
-                top_k,
+                search_candidates,  # Get more candidates for stricter filtering
                 include_snippets
             )
             analysis_time = time.time() - start_time
             
-            # Convert search results to similarity format
+            # Convert search results to similarity format with stricter filtering
             similar_patents = []
+            min_score_threshold = 0.15  # Minimum similarity score threshold for stricter matching
+            
             for result in general_results:
-                similar_patents.append({
-                    "patent_id": result.doc_id,
-                    "title": result.title,
-                    "similarity_score": result.score if result.score else 0.0,
-                    "doc_type": result.doc_type,
-                    "snippet": result.snippet if include_snippets else "",
-                    "source_file": result.source_file if hasattr(result, 'source_file') else None
-                })
+                score = result.score if result.score else 0.0
+                # Only include results above threshold for stricter matching
+                if score >= min_score_threshold:
+                    similar_patents.append({
+                        "patent_id": result.doc_id,
+                        "title": result.title,
+                        "similarity_score": score,
+                        "doc_type": result.doc_type,
+                        "snippet": result.snippet if include_snippets else "",
+                        "source_file": result.source_file if hasattr(result, 'source_file') else None
+                    })
+                # Stop once we have enough results (already sorted by score)
+                if len(similar_patents) >= top_k:
+                    break
             
             # Return a single "General" section with results
             section_results["general"] = SectionSimilarityResult(
