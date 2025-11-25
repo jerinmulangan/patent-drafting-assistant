@@ -61,7 +61,7 @@ const DraftAssistant: React.FC = () => {
           description: description.trim(),
           model: selectedModel,
           template_type: templateType,
-          search_mode: 'hybrid',
+          search_mode: 'hybrid-advanced',  // Use hybrid-advanced for stricter matching
           top_k: 5,
           include_snippets: true,
           use_cache: true
@@ -465,7 +465,7 @@ context-aware patent application drafts.`;
                     </p>
                     {similarity.similar_patents && similarity.similar_patents.length > 0 ? (
                       <div className="space-y-2">
-                        {similarity.similar_patents.slice(0, 3).map((patent, idx) => (
+                        {similarity.similar_patents.map((patent, idx) => (
                           <div key={idx} className="text-sm bg-gray-50 p-3 rounded border border-gray-100">
                             <div className="font-medium text-gray-900">{patent.title || `Patent ${patent.patent_id}`}</div>
                             <div className="text-xs text-gray-500 mt-1">ID: {patent.patent_id}</div>
