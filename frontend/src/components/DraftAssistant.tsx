@@ -24,6 +24,8 @@ const DraftAssistant: React.FC = () => {
   const [generationMode, setGenerationMode] = useState<GenerationMode>('similarity');
   const [similarityResults, setSimilarityResults] = useState<DraftWithSimilarityResponse | null>(null);
   const [sectionProgress, setSectionProgress] = useState<Array<{ name: string; text: string }>>([])
+  const hasSimilarity = !!(similarityResults && Object.keys(similarityResults.section_similarities || {}).length > 0);
+  const hasSectionProgress = sectionProgress.length > 0;
 
   // Check Ollama status on component mount
   useEffect(() => {
@@ -357,30 +359,30 @@ context-aware patent application drafts.`;
                 <label className="text-sm font-medium text-gray-700">
                   Generation Mode
                 </label>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    onClick={() => setGenerationMode('similarity')}
-                    className={`p-3 rounded-lg border-2 transition-all ${
-                      generationMode === 'similarity'
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className="text-sm font-medium text-gray-900">Generate with Similarity</div>
-                    <div className="text-xs text-gray-500 mt-1">Standard generation + prior art search</div>
-                  </button>
+                <div className="grid gap-3 sm:grid-cols-4">
                   <button
                     type="button"
                     onClick={() => setGenerationMode('advanced_similarity')}
-                    className={`p-3 rounded-lg border-2 transition-all ${
+                    className={`sm:col-span-3 p-3 rounded-lg border-2 transition-all ${
                       generationMode === 'advanced_similarity'
                         ? 'border-blue-500 bg-blue-50'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    <div className="text-sm font-medium text-gray-900">Advanced with Similarity</div>
-                    <div className="text-xs text-gray-500 mt-1">17-step system + prior art search</div>
+                    <div className="text-sm font-medium text-gray-900">Full Draft Generation with Similarity</div>
+                    <div className="text-xs text-gray-500 mt-1">Advanced drafting system + prior art search</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGenerationMode('similarity')}
+                    className={`sm:col-span-1 p-3 rounded-lg border-2 transition-all ${
+                      generationMode === 'similarity'
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="text-sm font-medium text-gray-900">Preview Draft</div>
+                    <div className="text-xs text-gray-500 mt-1">Basic draft generation + prior art search</div>
                   </button>
                 </div>
               </div>
@@ -472,126 +474,134 @@ context-aware patent application drafts.`;
           </CardContent>
         </Card>
 
-        {/* Section Progress */}
-        {sectionProgress.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Loader2 className="h-5 w-5 animate-spin" />
-                Section Generation Progress
-              </CardTitle>
-              <CardDescription>
-                Sections completed: {sectionProgress.length}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {sectionProgress.map((section, idx) => (
-                  <div key={idx} className="rounded-lg border border-green-200 bg-green-50 p-4">
-                    <h4 className="font-semibold text-green-900 mb-2">{section.name}</h4>
-                    <p className="text-sm text-green-700 line-clamp-3">{section.text}</p>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Generated Draft */}
-        {draft && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
+        {/* Responsive layout: left column (draft + progress) and right column (similarity) */}
+        <div className="grid gap-4 md:grid-cols-4">
+          <div className={`space-y-6 ${hasSimilarity ? 'md:col-span-3' : 'md:col-span-4'}`}>
+            {/* Section Progress */}
+            {hasSectionProgress && (
+              <Card>
+                <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Sparkles className="h-5 w-5" />
-                    Generated Patent Draft
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Section Generation Progress
                   </CardTitle>
                   <CardDescription>
-                    AI-generated patent application draft. Review and refine as needed.
+                    Sections completed: {sectionProgress.length}
                   </CardDescription>
-                </div>
-                <Button onClick={downloadDraft} variant="outline" size="sm">
-                  <Download className="mr-2 h-4 w-4" />
-                  Download
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-md border border-gray-200 bg-gray-50 p-6">
-                <div className="prose prose-sm max-w-none">
-                  <div className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-gray-800">
-                    {draft}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Similarity Results */}
-        {similarityResults && similarityResults.section_similarities && Object.keys(similarityResults.section_similarities).length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Prior Art Matches
-              </CardTitle>
-              <CardDescription>
-                Similar patents found for each section. Analysis time: {similarityResults.total_analysis_time.toFixed(2)}s
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {Object.entries(similarityResults.section_similarities).map(([sectionName, similarity]) => (
-                  <div key={sectionName} className="rounded-lg border border-gray-200 p-4">
-                    <h4 className="font-semibold text-gray-900 mb-2">{similarity.section_name || sectionName}</h4>
-                    <p className="text-sm text-gray-600 mb-3">
-                      Found {similarity.patent_count || (similarity.similar_patents?.length || 0)} similar patent{(similarity.patent_count || (similarity.similar_patents?.length || 0)) !== 1 ? 's' : ''} 
-                      {' '}({similarity.analysis_time?.toFixed(2) || '0.00'}s)
-                    </p>
-                    {similarity.similar_patents && similarity.similar_patents.length > 0 ? (
-                      <div className="space-y-2">
-                        {similarity.similar_patents.map((patent, idx) => (
-                          <div key={idx} className="text-sm bg-gray-50 p-3 rounded border border-gray-100">
-                            <div className="font-medium text-gray-900">{patent.title || `Patent ${patent.patent_id}`}</div>
-                            <div className="text-xs text-gray-500 mt-1">ID: {patent.patent_id}</div>
-                            {patent.snippet && (
-                              <div className="text-xs text-gray-600 mt-2 line-clamp-2">{patent.snippet}</div>
-                            )}
-                            {patent.similarity_score !== undefined && (
-                              <div className="text-xs text-gray-500 mt-1">Score: {patent.similarity_score.toFixed(3)}</div>
-                            )}
-                            {patent.doc_type && (
-                              <div className="text-xs text-gray-500 mt-1">Type: {patent.doc_type}</div>
-                            )}
-                          </div>
-                        ))}
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {sectionProgress.map((section, idx) => (
+                      <div key={idx} className="rounded-lg border border-green-200 bg-green-50 p-4">
+                        <h4 className="font-semibold text-green-900 mb-2">{section.name}</h4>
+                        <p className="text-sm text-green-700 line-clamp-3">{section.text}</p>
                       </div>
-                    ) : (
-                      <div className="text-sm text-gray-500 italic">No similar patents found for this section.</div>
-                    )}
+                    ))}
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-        {similarityResults && (!similarityResults.section_similarities || Object.keys(similarityResults.section_similarities).length === 0) && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Prior Art Matches
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-sm text-gray-500">
-                No section similarities available. The draft may not have been parsed into sections, or similarity analysis may have failed.
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Generated Draft */}
+            {draft && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Sparkles className="h-5 w-5" />
+                        Generated Patent Draft
+                      </CardTitle>
+                      <CardDescription>
+                        AI-generated patent application draft. Review and refine as needed.
+                      </CardDescription>
+                    </div>
+                    <Button onClick={downloadDraft} variant="outline" size="sm">
+                      <Download className="mr-2 h-4 w-4" />
+                      Download
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-md border border-gray-200 bg-gray-50 p-6">
+                    <div className="prose prose-sm max-w-none">
+                      <div className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-gray-800">
+                        {draft}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* Right column: Similarity / Prior Art */}
+          <div className="md:col-span-1 space-y-6">
+            {hasSimilarity && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Prior Art Matches
+                  </CardTitle>
+                  <CardDescription>
+                    Similar patents found for each section. Analysis time: {similarityResults!.total_analysis_time.toFixed(2)}s
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {Object.entries(similarityResults!.section_similarities).map(([sectionName, similarity]) => (
+                      <div key={sectionName} className="rounded-lg border border-gray-200 p-4">
+                        <h4 className="font-semibold text-gray-900 mb-2">{similarity.section_name || sectionName}</h4>
+                        <p className="text-sm text-gray-600 mb-3">
+                          Found {similarity.patent_count || (similarity.similar_patents?.length || 0)} similar patent{(similarity.patent_count || (similarity.similar_patents?.length || 0)) !== 1 ? 's' : ''} 
+                          {' '}({similarity.analysis_time?.toFixed(2) || '0.00'}s)
+                        </p>
+                        {similarity.similar_patents && similarity.similar_patents.length > 0 ? (
+                          <div className="space-y-2">
+                            {similarity.similar_patents.map((patent, idx) => (
+                              <div key={idx} className="text-sm bg-gray-50 p-3 rounded border border-gray-100">
+                                <div className="font-medium text-gray-900">{patent.title || `Patent ${patent.patent_id}`}</div>
+                                <div className="text-xs text-gray-500 mt-1">ID: {patent.patent_id}</div>
+                                {patent.snippet && (
+                                  <div className="text-xs text-gray-600 mt-2 line-clamp-2">{patent.snippet}</div>
+                                )}
+                                {patent.similarity_score !== undefined && (
+                                  <div className="text-xs text-gray-500 mt-1">Score: {patent.similarity_score.toFixed(3)}</div>
+                                )}
+                                {patent.doc_type && (
+                                  <div className="text-xs text-gray-500 mt-1">Type: {patent.doc_type}</div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-gray-500 italic">No similar patents found for this section.</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {similarityResults && (!similarityResults.section_similarities || Object.keys(similarityResults.section_similarities).length === 0) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Prior Art Matches
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-sm text-gray-500">
+                    No section similarities available. The draft may not have been parsed into sections, or similarity analysis may have failed.
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
