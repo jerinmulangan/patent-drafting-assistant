@@ -353,13 +353,27 @@ class AsyncOrchestrationService:
                 score = result.score if result.score else 0.0
                 # Only include results above threshold for stricter matching
                 if score >= min_score_threshold:
+                    # Convert chunk_details to dict format
+                    chunk_details_list = []
+                    if hasattr(result, 'chunk_details') and result.chunk_details:
+                        for chunk in result.chunk_details:
+                            chunk_details_list.append({
+                                "chunk_id": chunk.chunk_id if hasattr(chunk, 'chunk_id') else chunk.get('chunk_id', ''),
+                                "chunk_score": chunk.chunk_score if hasattr(chunk, 'chunk_score') else chunk.get('chunk_score', 0.0),
+                                "chunk_snippet": chunk.chunk_snippet if hasattr(chunk, 'chunk_snippet') else chunk.get('chunk_snippet', '')
+                            })
+                    
                     similar_patents.append({
                         "patent_id": result.doc_id,
                         "title": result.title,
                         "similarity_score": score,
                         "doc_type": result.doc_type,
                         "snippet": result.snippet if include_snippets else "",
-                        "source_file": result.source_file if hasattr(result, 'source_file') else None
+                        "source_file": result.source_file if hasattr(result, 'source_file') else None,
+                        "max_score": result.max_score if hasattr(result, 'max_score') else score,
+                        "avg_score": result.avg_score if hasattr(result, 'avg_score') else score,
+                        "chunk_count": result.chunk_count if hasattr(result, 'chunk_count') else 1,
+                        "chunk_details": chunk_details_list
                     })
                 # Stop once we have enough results (already sorted by score)
                 if len(similar_patents) >= top_k:
@@ -422,13 +436,27 @@ class AsyncOrchestrationService:
                 for result in general_results:
                     score = result.score if result.score else 0.0
                     if score >= min_score_threshold:
+                        # Convert chunk_details to dict format
+                        chunk_details_list = []
+                        if hasattr(result, 'chunk_details') and result.chunk_details:
+                            for chunk in result.chunk_details:
+                                chunk_details_list.append({
+                                    "chunk_id": chunk.chunk_id if hasattr(chunk, 'chunk_id') else chunk.get('chunk_id', ''),
+                                    "chunk_score": chunk.chunk_score if hasattr(chunk, 'chunk_score') else chunk.get('chunk_score', 0.0),
+                                    "chunk_snippet": chunk.chunk_snippet if hasattr(chunk, 'chunk_snippet') else chunk.get('chunk_snippet', '')
+                                })
+                        
                         similar_patents.append({
                             "patent_id": result.doc_id,
                             "title": result.title,
                             "similarity_score": score,
                             "doc_type": result.doc_type,
                             "snippet": result.snippet if include_snippets else "",
-                            "source_file": result.source_file if hasattr(result, 'source_file') else None
+                            "source_file": result.source_file if hasattr(result, 'source_file') else None,
+                            "max_score": result.max_score if hasattr(result, 'max_score') else score,
+                            "avg_score": result.avg_score if hasattr(result, 'avg_score') else score,
+                            "chunk_count": result.chunk_count if hasattr(result, 'chunk_count') else 1,
+                            "chunk_details": chunk_details_list
                         })
                     if len(similar_patents) >= top_k:
                         break
@@ -497,13 +525,27 @@ class AsyncOrchestrationService:
             # Convert to similarity format
             similar_patents = []
             for result in search_results:
+                # Convert chunk_details to dict format
+                chunk_details_list = []
+                if hasattr(result, 'chunk_details') and result.chunk_details:
+                    for chunk in result.chunk_details:
+                        chunk_details_list.append({
+                            "chunk_id": chunk.chunk_id if hasattr(chunk, 'chunk_id') else chunk.get('chunk_id', ''),
+                            "chunk_score": chunk.chunk_score if hasattr(chunk, 'chunk_score') else chunk.get('chunk_score', 0.0),
+                            "chunk_snippet": chunk.chunk_snippet if hasattr(chunk, 'chunk_snippet') else chunk.get('chunk_snippet', '')
+                        })
+                
                 similar_patents.append({
                     "patent_id": result.doc_id,
                     "title": result.title,
                     "similarity_score": result.score,
                     "doc_type": result.doc_type,
                     "snippet": result.snippet if include_snippets else "",
-                    "source_file": result.source_file
+                    "source_file": result.source_file,
+                    "max_score": result.max_score if hasattr(result, 'max_score') else result.score,
+                    "avg_score": result.avg_score if hasattr(result, 'avg_score') else result.score,
+                    "chunk_count": result.chunk_count if hasattr(result, 'chunk_count') else 1,
+                    "chunk_details": chunk_details_list
                 })
             
             analysis_time = time.time() - start_time

@@ -10,6 +10,7 @@ const api = axios.create({
 });
 
 // Types for API requests and responses
+
 export interface SearchRequest {
   query: string;
   mode: 'tfidf' | 'semantic' | 'hybrid' | 'hybrid-advanced';
@@ -21,6 +22,12 @@ export interface SearchRequest {
   include_snippets?: boolean;
   include_metadata?: boolean;
   log_enabled?: boolean;
+}
+
+export interface ChunkDetail {
+  chunk_id: string;
+  chunk_score: number;
+  chunk_snippet: string;
 }
 
 export interface SearchResult {
@@ -36,6 +43,10 @@ export interface SearchResult {
   source_file?: string;
   base_doc_id?: string;
   score?: number;
+  chunk_details?: ChunkDetail[];
+  max_score?: number;
+  avg_score?: number;
+  chunk_count?: number;
 }
 
 export interface SearchResponse {
@@ -261,6 +272,10 @@ export interface SimilarPatent {
   doc_type?: string;
   snippet?: string;
   source_file?: string;
+  max_score?: number;
+  avg_score?: number;
+  chunk_count?: number;
+  chunk_details?: ChunkDetail[];
 }
 
 export interface SectionSimilarity {
