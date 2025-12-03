@@ -196,6 +196,39 @@ export interface AdvancedDraftResponse {
   model_used: Record<string, string>;
 }
 
+export interface AdvancedDraftWithSimilarityRequest {
+  description: string;
+  precision_model?: string;
+  fluency_model?: string;
+  use_ensemble?: boolean;
+  use_scaffolding?: boolean;
+  use_two_pass?: boolean;
+  use_critique?: boolean;
+  run_evaluation?: boolean;
+  search_mode?: 'tfidf' | 'semantic' | 'hybrid' | 'hybrid-advanced';
+  top_k?: number;
+  include_snippets?: boolean;
+}
+
+export interface AdvancedDraftWithSimilarityResponse {
+  success: boolean;
+  message: string;
+  sections: Record<string, string>;
+  glossary: Record<string, any>;
+  outline?: string;
+  critique_results?: Record<string, any>;
+  evaluation_results?: Record<string, any>;
+  generation_time: number;
+  model_used: Record<string, string>;
+  section_similarities: Record<string, SectionSimilarity>;
+  total_analysis_time: number;
+}
+
+export type StreamProgressEvent = 
+  | { type: 'section_complete'; section_name: string; section_text: string; total_sections: number }
+  | { type: 'complete'; success: boolean; total_sections: number; generation_time: number }
+  | { type: 'error'; message: string };
+
 
 export interface OllamaHealthResponse {
   status: string;
@@ -305,6 +338,60 @@ export const draftAPI = {
   generateDraftAdvanced: async (request: AdvancedDraftRequest): Promise<AdvancedDraftResponse> => {
     const response = await api.post('/api/v1/generate_draft_advanced', request);
     return response.data;
+  },
+
+  generateDraftAdvancedWithSimilarity: async (request: AdvancedDraftWithSimilarityRequest): Promise<AdvancedDraftWithSimilarityResponse> => {
+    const response = await api.post('/api/v1/generate_draft_advanced_with_similarity', request);
+    return response.data;
+  },
+
+  generateDraftAdvancedWithSimilarityStream: async (
+    request: AdvancedDraftWithSimilarityRequest,
+    onProgress: (event: StreamProgressEvent) => void
+  ): Promise<void> => {
+    const response = await fetch(`${API_BASE_URL}/api/v1/generate_draft_advanced_with_similarity_stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('Response body is not readable');
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const eventData = JSON.parse(line.slice(6));
+              onProgress(eventData);
+            } catch (e) {
+              console.error('Error parsing event data:', e);
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
   },
 
   generateDraftWithSimilarity: async (request: DraftWithSimilarityRequest): Promise<DraftWithSimilarityResponse> => {

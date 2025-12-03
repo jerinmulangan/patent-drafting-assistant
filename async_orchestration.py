@@ -129,6 +129,132 @@ class AsyncOrchestrationService:
                 message=f"Error: {str(e)}"
             )
     
+    async def generate_advanced_with_similarity(
+        self,
+        description: str,
+        precision_model: str,
+        fluency_model: str,
+        use_ensemble: bool = True,
+        use_scaffolding: bool = True,
+        use_two_pass: bool = True,
+        use_critique: bool = True,
+        search_mode: str = 'hybrid-advanced',
+        top_k: int = 5,
+        include_snippets: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Generate patent draft using advanced 17-step system with concurrent similarity search.
+        
+        Args:
+            description: Invention description
+            precision_model: Model for precision generation
+            fluency_model: Model for fluency
+            use_ensemble: Whether to use ensemble methods
+            use_scaffolding: Whether to use scaffolding
+            use_two_pass: Whether to use two-pass generation
+            use_critique: Whether to use self-critique
+            search_mode: Search mode for similarity search
+            top_k: Number of similar patents to find
+            include_snippets: Whether to include text snippets
+            
+        Returns:
+            Dict with generated sections and similarity analysis
+        """
+        start_time = time.time()
+        
+        try:
+            # Import here to avoid circular imports
+            from patent_drafting_system import get_advanced_drafting_system
+            
+            # Get advanced drafting system
+            drafting_system = get_advanced_drafting_system(
+                precision_model=precision_model,
+                fluency_model=fluency_model
+            )
+            
+            # Start both advanced draft generation and search concurrently
+            draft_task = asyncio.create_task(
+                self._generate_advanced_draft_async(
+                    drafting_system,
+                    description,
+                    use_ensemble,
+                    use_scaffolding,
+                    use_two_pass,
+                    use_critique
+                )
+            )
+            search_task = asyncio.create_task(
+                self._search_patents_async(description, search_mode, top_k, include_snippets)
+            )
+            
+            # Wait for both to complete
+            draft_result, search_results = await asyncio.gather(draft_task, search_task)
+            
+            # Analyze similarity for each section in the advanced draft
+            section_similarities = await self._analyze_advanced_section_similarities(
+                draft_result,
+                search_results,
+                search_mode,
+                top_k,
+                include_snippets,
+                original_prompt=description
+            )
+            
+            total_time = time.time() - start_time
+            
+            return {
+                "sections": draft_result.get("sections", {}),
+                "glossary": draft_result.get("glossary", {}),
+                "outline": draft_result.get("outline"),
+                "critique_results": draft_result.get("critique_results"),
+                "model_used": draft_result.get("model_used", {}),
+                "generation_time": draft_result.get("generation_time", 0.0),
+                "section_similarities": section_similarities,
+                "total_analysis_time": total_time,
+                "success": True,
+                "message": "Advanced draft generated with similarity analysis"
+            }
+            
+        except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"Error in advanced generation with similarity: {error_details}")
+            return {
+                "sections": {},
+                "glossary": {},
+                "outline": None,
+                "critique_results": None,
+                "model_used": {},
+                "generation_time": 0.0,
+                "section_similarities": {},
+                "total_analysis_time": time.time() - start_time,
+                "success": False,
+                "message": f"Error: {str(e)}"
+            }
+    
+    async def _generate_advanced_draft_async(
+        self,
+        drafting_system: Any,
+        description: str,
+        use_ensemble: bool,
+        use_scaffolding: bool,
+        use_two_pass: bool,
+        use_critique: bool,
+        on_section_complete: Optional[callable] = None
+    ) -> Dict[str, Any]:
+        """Generate advanced draft asynchronously."""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            self.executor,
+            drafting_system.generate_complete_draft,
+            description,
+            use_ensemble,
+            use_scaffolding,
+            use_two_pass,
+            use_critique,
+            on_section_complete
+        )
+
     async def _generate_draft_async(
         self, 
         prompt: str, 
@@ -258,6 +384,93 @@ class AsyncOrchestrationService:
                 similar_patents=result.similar_patents,
                 analysis_time=result.analysis_time
             )
+        
+        return section_similarities
+
+    async def _analyze_advanced_section_similarities(
+        self,
+        draft_result: Dict[str, Any],
+        search_results: Tuple[List[SearchResult], Dict[str, Any]],
+        search_mode: str,
+        top_k: int,
+        include_snippets: bool,
+        original_prompt: str = None
+    ) -> Dict[str, Any]:
+        """Analyze similarity for each section of the advanced generated draft."""
+        section_similarities = {}
+        sections = draft_result.get("sections", {})
+        
+        try:
+            # If no sections, do a general search
+            if not sections or len(sections) == 0:
+                print("Warning: No sections in advanced draft, performing general similarity search")
+                start_time = time.time()
+                
+                query = original_prompt if original_prompt else ""
+                search_candidates = top_k * 2
+                general_results, _ = await self._search_patents_async(
+                    query,
+                    search_mode,
+                    search_candidates,
+                    include_snippets
+                )
+                analysis_time = time.time() - start_time
+                
+                similar_patents = []
+                min_score_threshold = 0.15
+                
+                for result in general_results:
+                    score = result.score if result.score else 0.0
+                    if score >= min_score_threshold:
+                        similar_patents.append({
+                            "patent_id": result.doc_id,
+                            "title": result.title,
+                            "similarity_score": score,
+                            "doc_type": result.doc_type,
+                            "snippet": result.snippet if include_snippets else "",
+                            "source_file": result.source_file if hasattr(result, 'source_file') else None
+                        })
+                    if len(similar_patents) >= top_k:
+                        break
+                
+                section_similarities["general"] = SectionSimilarity(
+                    section_name="Prior Art Search",
+                    section_text=query[:500] + "..." if len(query) > 500 else query,
+                    similar_patents=similar_patents,
+                    analysis_time=analysis_time
+                )
+            else:
+                # Analyze each section
+                for section_name, section_text in sections.items():
+                    if not section_text or not section_text.strip():
+                        continue
+                    
+                    # Skip very short sections (less than 50 chars)
+                    if len(section_text.strip()) < 50:
+                        continue
+                    
+                    # Search for this section with concurrency where possible
+                    try:
+                        similar = await self._analyze_single_section(
+                            section_name,
+                            section_text,
+                            search_mode,
+                            top_k,
+                            include_snippets
+                        )
+                        section_similarities[section_name] = similar
+                    except Exception as e:
+                        print(f"Error analyzing section {section_name}: {e}")
+                        # Return empty similarity for this section
+                        section_similarities[section_name] = SectionSimilarity(
+                            section_name=section_name,
+                            section_text=section_text[:500],
+                            similar_patents=[],
+                            analysis_time=0.0
+                        )
+            
+        except Exception as e:
+            print(f"Error in advanced section similarity analysis: {e}")
         
         return section_similarities
     
