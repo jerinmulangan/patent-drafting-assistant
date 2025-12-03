@@ -53,6 +53,25 @@ class SearchRequest:
         self.log_enabled = log_enabled
 
 
+class ChunkDetail:
+    """Details about a chunk from a document."""
+    def __init__(self, 
+                 chunk_id: str,
+                 chunk_score: float,
+                 chunk_snippet: str = ""):
+        self.chunk_id = chunk_id
+        self.chunk_score = chunk_score
+        self.chunk_snippet = chunk_snippet
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "chunk_id": self.chunk_id,
+            "chunk_score": self.chunk_score,
+            "chunk_snippet": self.chunk_snippet
+        }
+
+
 class SearchResult:
     """Standardized search result format."""
     def __init__(self, 
@@ -62,7 +81,11 @@ class SearchResult:
                  doc_type: str = "",
                  source_file: str = "",
                  snippet: str = "",
-                 base_doc_id: str = ""):
+                 base_doc_id: str = "",
+                 chunk_details: Optional[List[ChunkDetail]] = None,
+                 max_score: float = 0.0,
+                 avg_score: float = 0.0,
+                 chunk_count: int = 0):
         self.doc_id = doc_id
         self.score = score
         self.title = title
@@ -70,6 +93,10 @@ class SearchResult:
         self.source_file = source_file
         self.snippet = snippet
         self.base_doc_id = base_doc_id
+        self.chunk_details = chunk_details or []
+        self.max_score = max_score
+        self.avg_score = avg_score
+        self.chunk_count = chunk_count
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -80,8 +107,101 @@ class SearchResult:
             "doc_type": self.doc_type,
             "source_file": self.source_file,
             "snippet": self.snippet,
-            "base_doc_id": self.base_doc_id
+            "base_doc_id": self.base_doc_id,
+            "chunk_details": [chunk.to_dict() for chunk in self.chunk_details],
+            "max_score": self.max_score,
+            "avg_score": self.avg_score,
+            "chunk_count": self.chunk_count
         }
+
+
+def compute_hybrid_score(max_score: float, avg_score: float, 
+                        max_weight: float = 0.7, avg_weight: float = 0.3) -> float:
+    """
+    Compute a hybrid document score from max and average chunk scores.
+    
+    Args:
+        max_score: Highest chunk score for the document
+        avg_score: Average score across all chunks in the document
+        max_weight: Weight for max score (default 0.7)
+        avg_weight: Weight for average score (default 0.3)
+    
+    Returns:
+        Combined hybrid score
+    """
+    return (max_score * max_weight) + (avg_score * avg_weight)
+
+
+def aggregate_chunk_results_by_document(chunk_results: List[SearchResult]) -> List[SearchResult]:
+    """
+    Aggregate chunk-level results into document-level results.
+    
+    Groups all chunks from the same document and computes:
+    - max_score: highest chunk score
+    - avg_score: average chunk score
+    - hybrid_score: weighted combination (0.7 * max + 0.3 * avg)
+    
+    Args:
+        chunk_results: List of chunk-level SearchResult objects
+    
+    Returns:
+        List of document-level SearchResult objects sorted by hybrid score
+    """
+    from collections import defaultdict
+    
+    # Group chunks by base_doc_id
+    doc_chunks: Dict[str, List[SearchResult]] = defaultdict(list)
+    for result in chunk_results:
+        base_id = result.base_doc_id if result.base_doc_id else result.doc_id.split('_chunk')[0]
+        doc_chunks[base_id].append(result)
+    
+    # Aggregate each document
+    aggregated_results = []
+    for base_doc_id, chunks in doc_chunks.items():
+        if not chunks:
+            continue
+        
+        # Use first chunk as template for document info
+        template = chunks[0]
+        
+        # Calculate scores
+        scores = [c.score for c in chunks]
+        max_score = max(scores)
+        avg_score = sum(scores) / len(scores)
+        hybrid_score = compute_hybrid_score(max_score, avg_score)
+        
+        # Create chunk details
+        chunk_details = []
+        for chunk in chunks:
+            chunk_details.append(ChunkDetail(
+                chunk_id=chunk.doc_id,
+                chunk_score=chunk.score,
+                chunk_snippet=chunk.snippet
+            ))
+        
+        # Sort chunks by score descending
+        chunk_details.sort(key=lambda x: x.chunk_score, reverse=True)
+        
+        # Create aggregated result
+        agg_result = SearchResult(
+            doc_id=base_doc_id,
+            score=hybrid_score,
+            title=template.title,
+            doc_type=template.doc_type,
+            source_file=template.source_file,
+            snippet=chunk_details[0].chunk_snippet if chunk_details else template.snippet,
+            base_doc_id=base_doc_id,
+            chunk_details=chunk_details,
+            max_score=max_score,
+            avg_score=avg_score,
+            chunk_count=len(chunks)
+        )
+        aggregated_results.append(agg_result)
+    
+    # Sort by hybrid score descending
+    aggregated_results.sort(key=lambda x: x.score, reverse=True)
+    
+    return aggregated_results
 
 
 def run_search(request: SearchRequest) -> Tuple[List[SearchResult], Dict[str, Any]]:
@@ -203,6 +323,9 @@ def run_search(request: SearchRequest) -> Tuple[List[SearchResult], Dict[str, An
                 result.snippet = generate_snippet(chunk_text, request.query)
         
         results.append(result)
+    
+    # Aggregate chunk-level results into document-level results
+    results = aggregate_chunk_results_by_document(results)
     
     # Log query if enabled
     if request.log_enabled:

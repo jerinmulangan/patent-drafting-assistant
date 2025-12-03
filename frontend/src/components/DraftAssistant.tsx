@@ -560,19 +560,7 @@ context-aware patent application drafts.`;
                         {similarity.similar_patents && similarity.similar_patents.length > 0 ? (
                           <div className="space-y-2">
                             {similarity.similar_patents.map((patent, idx) => (
-                              <div key={idx} className="text-sm bg-gray-50 p-3 rounded border border-gray-100">
-                                <div className="font-medium text-gray-900">{patent.title || `Patent ${patent.patent_id}`}</div>
-                                <div className="text-xs text-gray-500 mt-1">ID: {patent.patent_id}</div>
-                                {patent.snippet && (
-                                  <div className="text-xs text-gray-600 mt-2 line-clamp-2">{patent.snippet}</div>
-                                )}
-                                {patent.similarity_score !== undefined && (
-                                  <div className="text-xs text-gray-500 mt-1">Score: {patent.similarity_score.toFixed(3)}</div>
-                                )}
-                                {patent.doc_type && (
-                                  <div className="text-xs text-gray-500 mt-1">Type: {patent.doc_type}</div>
-                                )}
-                              </div>
+                              <PatentResultItem key={idx} patent={patent} />
                             ))}
                           </div>
                         ) : (
@@ -607,6 +595,89 @@ context-aware patent application drafts.`;
   );
 };
 
+// Component for displaying document-level patent results with expandable chunks
+const PatentResultItem: React.FC<{ patent: any }> = ({ patent }) => {
+  const [isExpanded, setIsExpanded] = React.useState(false);
+  
+  return (
+    <div className="text-sm bg-gray-50 p-4 rounded border border-gray-100">
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <div className="font-medium text-gray-900">{patent.title || `Patent ${patent.patent_id}`}</div>
+          <div className="text-xs text-gray-500 mt-1">ID: {patent.patent_id}</div>
+          
+          {/* Document-level scores */}
+          <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+            {patent.max_score !== undefined && (
+              <div className="bg-white p-2 rounded border border-gray-200">
+                <div className="text-gray-500">Max Score</div>
+                <div className="font-semibold text-gray-900">{patent.max_score.toFixed(3)}</div>
+              </div>
+            )}
+            {patent.avg_score !== undefined && (
+              <div className="bg-white p-2 rounded border border-gray-200">
+                <div className="text-gray-500">Avg Score</div>
+                <div className="font-semibold text-gray-900">{patent.avg_score.toFixed(3)}</div>
+              </div>
+            )}
+            {patent.similarity_score !== undefined && (
+              <div className="bg-white p-2 rounded border border-gray-200">
+                <div className="text-gray-500">Hybrid Score</div>
+                <div className="font-semibold text-gray-900">{patent.similarity_score.toFixed(3)}</div>
+              </div>
+            )}
+          </div>
+          
+          {/* Top snippet */}
+          {patent.snippet && (
+            <div className="text-xs text-gray-600 mt-2 line-clamp-2 bg-white p-2 rounded border border-gray-200">
+              {patent.snippet}
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Chunk expansion button */}
+      {patent.chunk_details && patent.chunk_details.length > 0 && (
+        <div className="mt-3 border-t border-gray-200 pt-3">
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+          >
+            {isExpanded ? '▼' : '▶'} Chunks ({patent.chunk_count || patent.chunk_details.length} matches)
+          </button>
+          
+          {/* Expanded chunk list */}
+          {isExpanded && (
+            <div className="mt-2 space-y-2">
+              {patent.chunk_details.map((chunk: any, idx: number) => (
+                <div key={idx} className="bg-white border border-gray-200 rounded p-2 ml-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="text-xs font-mono text-gray-500">{chunk.chunk_id}</div>
+                      <div className="inline-block mt-1 px-2 py-1 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
+                        Score: {chunk.chunk_score.toFixed(3)}
+                      </div>
+                    </div>
+                  </div>
+                  {chunk.chunk_snippet && (
+                    <div className="text-xs text-gray-600 mt-2 line-clamp-2 bg-gray-50 p-2 rounded border border-gray-100">
+                      {chunk.chunk_snippet}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* Fallback info */}
+      {patent.doc_type && !patent.chunk_details && (
+        <div className="text-xs text-gray-500 mt-2">Type: {patent.doc_type}</div>
+      )}
+    </div>
+  );
+};
+
 export default DraftAssistant;
-
-
