@@ -4,6 +4,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import Navbar from './components/Navbar';
 import SearchInterface from './components/SearchInterface';
 import DraftAssistant from './components/DraftAssistant';
+import SavedDrafts from './components/SavedDrafts';
 import CompareModes from './components/CompareModes';
 import BatchSearch from './components/BatchSearch';
 import LogAnalysis from './components/LogAnalysis';
@@ -23,6 +24,7 @@ function App() {
               <Route path="/batch" element={<BatchSearch />} />
               <Route path="/logs" element={<LogAnalysis />} />
               <Route path="/draft" element={<DraftAssistant />} />
+              <Route path="/saved-drafts" element={<SavedDrafts />} />
               <Route path="/about" element={<About />} />
             </Routes>
           </main>
