@@ -293,6 +293,138 @@ class DraftResponseModel(BaseModel):
     success: bool = True
     message: str = "Draft generated successfully"
 
+
+class SaveDraftRequestModel(BaseModel):
+    title: Optional[str] = None
+    content: str
+    model: Optional[str] = None
+    template_type: Optional[str] = None
+
+
+class SavedDraftModel(BaseModel):
+    id: str
+    title: Optional[str] = None
+    content: str
+    model: Optional[str] = None
+    template_type: Optional[str] = None
+    generation_time: Optional[float] = None
+    created_at: str
+
+
+@router.post("/drafts", response_model=SavedDraftModel)
+async def save_draft_endpoint(request: SaveDraftRequestModel):
+    """Save a generated draft to server-side storage (JSONL file)."""
+    try:
+        import uuid
+        from datetime import datetime
+        drafts_dir = Path("data/processed")
+        drafts_dir.mkdir(parents=True, exist_ok=True)
+        file_path = drafts_dir / "saved_drafts.jsonl"
+
+        draft_id = str(uuid.uuid4())
+        created_at = datetime.utcnow().isoformat() + "Z"
+
+        draft_entry = {
+            "id": draft_id,
+            "title": request.title or (request.content.splitlines()[0] if request.content else "Untitled Draft"),
+            "content": request.content,
+            "model": request.model,
+            "template_type": request.template_type,
+            "generation_time": None,
+            "created_at": created_at
+        }
+
+        with open(file_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(draft_entry) + "\n")
+
+        return draft_entry
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save draft: {str(e)}")
+
+
+@router.get("/drafts")
+async def list_drafts_endpoint():
+    """Return the list of saved drafts."""
+    try:
+        file_path = Path("data/processed/saved_drafts.jsonl")
+        if not file_path.exists():
+            return []
+
+        drafts = []
+        with open(file_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    drafts.append(json.loads(line))
+                except Exception:
+                    continue
+        # return most recent first
+        drafts.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+        return drafts
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list drafts: {str(e)}")
+
+
+@router.get("/drafts/{draft_id}")
+async def get_draft_endpoint(draft_id: str):
+    try:
+        file_path = Path("data/processed/saved_drafts.jsonl")
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="Draft not found")
+
+        with open(file_path, "r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    entry = json.loads(line)
+                    if entry.get("id") == draft_id:
+                        return entry
+                except Exception:
+                    continue
+
+        raise HTTPException(status_code=404, detail="Draft not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get draft: {str(e)}")
+
+
+@router.delete("/drafts/{draft_id}")
+async def delete_draft_endpoint(draft_id: str):
+    """Delete a saved draft by id (rewrites file excluding the deleted draft)."""
+    try:
+        file_path = Path("data/processed/saved_drafts.jsonl")
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="Draft not found")
+
+        kept = []
+        found = False
+        with open(file_path, "r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    entry = json.loads(line)
+                    if entry.get("id") == draft_id:
+                        found = True
+                        continue
+                    kept.append(entry)
+                except Exception:
+                    continue
+
+        if not found:
+            raise HTTPException(status_code=404, detail="Draft not found")
+
+        # Rewrite file
+        with open(file_path, "w", encoding="utf-8") as f:
+            for entry in kept:
+                f.write(json.dumps(entry) + "\n")
+
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete draft: {str(e)}")
+
 class DraftWithSearchRequestModel(DraftRequestModel):
     search_mode: str = "semantic"
     search_top_k: int = 5

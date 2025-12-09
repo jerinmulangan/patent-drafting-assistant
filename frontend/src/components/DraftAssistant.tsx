@@ -6,7 +6,7 @@ import { Select } from './ui/Select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/Card';
 import { Alert } from './ui/Alert';
 import { Badge } from './ui/Badge';
-import { draftAPI, DraftRequest, DraftResponse, OllamaHealthResponse, StreamProgressEvent } from '../services/api';
+import { draftAPI, searchAPI, DraftRequest, DraftResponse, OllamaHealthResponse, StreamProgressEvent, SaveDraftRequest, SavedDraft } from '../services/api';
 import { DraftV2Request, DraftV2Response, AdvancedDraftRequest, AdvancedDraftResponse, AdvancedDraftWithSimilarityRequest, AdvancedDraftWithSimilarityResponse, DraftWithSimilarityRequest, DraftWithSimilarityResponse } from '../services/api';
 
 type GenerationMode = 'similarity' | 'advanced_similarity';
@@ -24,6 +24,8 @@ const DraftAssistant: React.FC = () => {
   const [generationMode, setGenerationMode] = useState<GenerationMode>('similarity');
   const [similarityResults, setSimilarityResults] = useState<DraftWithSimilarityResponse | null>(null);
   const [sectionProgress, setSectionProgress] = useState<Array<{ name: string; text: string }>>([])
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const hasSimilarity = !!(similarityResults && Object.keys(similarityResults.section_similarities || {}).length > 0);
   const hasSectionProgress = sectionProgress.length > 0;
 
@@ -516,10 +518,40 @@ context-aware patent application drafts.`;
                         AI-generated patent application draft. Review and refine as needed.
                       </CardDescription>
                     </div>
-                    <Button onClick={downloadDraft} variant="outline" size="sm">
-                      <Download className="mr-2 h-4 w-4" />
-                      Download
-                    </Button>
+                      <div className="flex items-center gap-2">
+                        <Button onClick={downloadDraft} variant="outline" size="sm">
+                          <Download className="mr-2 h-4 w-4" />
+                          Download
+                        </Button>
+                        <Button
+                          onClick={async () => {
+                            if (!draft) return;
+                            setSaveLoading(true);
+                            setSaveMessage(null);
+                            try {
+                              const payload: SaveDraftRequest = {
+                                title: draft.split('\n')[0].slice(0, 120),
+                                content: draft,
+                                model: selectedModel,
+                                template_type: templateType
+                              };
+                              const saved: SavedDraft = await searchAPI.saveDraft(payload);
+                              setSaveMessage('Saved draft');
+                            } catch (e) {
+                              console.error('Save draft failed', e);
+                              setSaveMessage('Failed to save draft');
+                            } finally {
+                              setSaveLoading(false);
+                              setTimeout(() => setSaveMessage(null), 3000);
+                            }
+                          }}
+                          variant="secondary"
+                          size="sm"
+                          disabled={saveLoading}
+                        >
+                          {saveLoading ? 'Saving...' : 'Save Draft'}
+                        </Button>
+                      </div>
                   </div>
                 </CardHeader>
                 <CardContent>

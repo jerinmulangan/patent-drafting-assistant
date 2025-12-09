@@ -298,6 +298,23 @@ export interface DraftWithSimilarityResponse {
   message: string;
 }
 
+export interface SaveDraftRequest {
+  title?: string;
+  content: string;
+  model?: string;
+  template_type?: string;
+}
+
+export interface SavedDraft {
+  id: string;
+  title?: string;
+  content: string;
+  model?: string;
+  template_type?: string;
+  generation_time?: number | null;
+  created_at: string;
+}
+
 // API functions
 export const searchAPI = {
   // Basic search
@@ -334,6 +351,23 @@ export const searchAPI = {
   // Health check
   health: async (): Promise<HealthResponse> => {
     const response = await api.get('/api/v1/health');
+    return response.data;
+  },
+  // Drafts management
+  saveDraft: async (request: SaveDraftRequest): Promise<SavedDraft> => {
+    const response = await api.post('/api/v1/drafts', request);
+    return response.data;
+  },
+  listDrafts: async (): Promise<SavedDraft[]> => {
+    const response = await api.get('/api/v1/drafts');
+    return response.data;
+  },
+  getDraft: async (id: string): Promise<SavedDraft> => {
+    const response = await api.get(`/api/v1/drafts/${id}`);
+    return response.data;
+  },
+  deleteDraft: async (id: string): Promise<{success: boolean}> => {
+    const response = await api.delete(`/api/v1/drafts/${id}`);
     return response.data;
   },
 };
