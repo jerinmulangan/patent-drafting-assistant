@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Loader2, Sparkles, Settings, Download, RefreshCw } from 'lucide-react';
+import { FileText, Loader2, Sparkles, Settings, Download, RefreshCw, ChevronDown } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Textarea } from './ui/Textarea';
 import { Select } from './ui/Select';
@@ -8,6 +8,7 @@ import { Alert } from './ui/Alert';
 import { Badge } from './ui/Badge';
 import { draftAPI, searchAPI, DraftRequest, DraftResponse, OllamaHealthResponse, StreamProgressEvent, SaveDraftRequest, SavedDraft } from '../services/api';
 import { DraftV2Request, DraftV2Response, AdvancedDraftRequest, AdvancedDraftResponse, AdvancedDraftWithSimilarityRequest, AdvancedDraftWithSimilarityResponse, DraftWithSimilarityRequest, DraftWithSimilarityResponse } from '../services/api';
+import { downloadDraft } from '../utils/downloadDraft';
 
 type GenerationMode = 'similarity' | 'advanced_similarity';
 
@@ -26,6 +27,8 @@ const DraftAssistant: React.FC = () => {
   const [sectionProgress, setSectionProgress] = useState<Array<{ name: string; text: string }>>([])
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+  const [downloadLoading, setDownloadLoading] = useState(false);
   const hasSimilarity = !!(similarityResults && Object.keys(similarityResults.section_similarities || {}).length > 0);
   const hasSectionProgress = sectionProgress.length > 0;
 
@@ -219,18 +222,18 @@ const DraftAssistant: React.FC = () => {
   };
 
 
-  const downloadDraft = () => {
+  const handleDownload = async (format: 'txt' | 'pdf' | 'docx') => {
     if (!draft) return;
-    
-    const blob = new Blob([draft], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `patent_draft_${new Date().toISOString().split('T')[0]}.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    setDownloadLoading(true);
+    try {
+      await downloadDraft(draft, format);
+    } catch (err) {
+      console.error('Download failed:', err);
+      alert('Failed to download draft');
+    } finally {
+      setDownloadLoading(false);
+      setShowDownloadMenu(false);
+    }
   };
 
   const generatePlaceholderDraft = (description: string): string => {
@@ -282,6 +285,9 @@ context-aware patent application drafts.`;
           </h1>
           <p className="mt-2 text-lg text-gray-600">
             Generate professional patent applications using AI
+          </p>
+          <p className="mt-2 text-sm text-gray-600">
+            Not intended for legal advice or official use, For professional assistance, consult a patent attorney
           </p>
         </div>
 
@@ -518,11 +524,44 @@ context-aware patent application drafts.`;
                         AI-generated patent application draft. Review and refine as needed.
                       </CardDescription>
                     </div>
-                      <div className="flex items-center gap-2">
-                        <Button onClick={downloadDraft} variant="outline" size="sm">
+                    <div className="flex items-center gap-2 relative">
+                      <div className="relative">
+                        <Button
+                          onClick={() => setShowDownloadMenu(!showDownloadMenu)}
+                          variant="outline"
+                          size="sm"
+                          disabled={downloadLoading}
+                        >
                           <Download className="mr-2 h-4 w-4" />
                           Download
+                          <ChevronDown className="ml-1 h-4 w-4" />
                         </Button>
+                        {showDownloadMenu && (
+                          <div className="absolute right-0 mt-1 w-32 bg-white border border-gray-200 rounded shadow-lg z-50">
+                            <button
+                              onClick={() => handleDownload('txt')}
+                              disabled={downloadLoading}
+                              className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 disabled:opacity-50"
+                            >
+                              Text (.txt)
+                            </button>
+                            <button
+                              onClick={() => handleDownload('docx')}
+                              disabled={downloadLoading}
+                              className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 disabled:opacity-50"
+                            >
+                              Word (.docx)
+                            </button>
+                            <button
+                              onClick={() => handleDownload('pdf')}
+                              disabled={downloadLoading}
+                              className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 disabled:opacity-50"
+                            >
+                              PDF (.pdf)
+                            </button>
+                          </div>
+                        )}
+                      </div>
                         <Button
                           onClick={async () => {
                             if (!draft) return;
