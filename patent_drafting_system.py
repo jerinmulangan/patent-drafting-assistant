@@ -1897,6 +1897,7 @@ Generate ONLY the refined section text. Remove ALL marketing language, performan
             }
             
             return {
+                "success": True,
                 "sections": cleaned_harmonized,
                 "glossary": self.terminology_manager.to_dict(),
                 "outline": outline_str,

@@ -1,19 +1,83 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --ink: #0b132b;
+  --ink-muted: #6c7a9c;
+  --sky: #eef2ff;
+  --shell: linear-gradient(135deg, #f4f7fb 0%, #e9f1ff 100%);
+}
+
+* {
+  font-family: 'IBM Plex Sans', 'Space Grotesk', system-ui, -apple-system,
+    BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  min-height: 100vh;
+  background: var(--shell);
+  color: var(--ink);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+h1,
+h2,
+h3,
+.futuristic-heading {
+  font-family: 'Space Grotesk', 'IBM Plex Sans', system-ui, sans-serif;
 }
 
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+  background: transparent;
+}
 
+.app-sidebar {
+  width: 260px;
+  background: #081228;
+  color: white;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-main {
+  flex: 1;
+  background: transparent;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.glass-panel {
+  backdrop-filter: blur(30px);
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 25px 60px rgba(15, 23, 42, 0.1);
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
+}
+
+.radial-card {
+  background: radial-gradient(circle at 20% 20%, rgba(73, 149, 255, 0.15), transparent),
+    #fff;
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  border-radius: 1.25rem;
+}
+
+.page-padding {
+  padding: 2rem clamp(1.25rem, 4vw, 3rem) 3rem;
+}
+
+code {
+  font-family: 'JetBrains Mono', 'IBM Plex Mono', 'Space Grotesk', monospace;
+}
