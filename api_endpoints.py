@@ -8,11 +8,13 @@ from pydantic import Field
 import re
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, validator, ValidationError
 from typing import List, Dict, Any, Optional
 import json
 import os
 from pathlib import Path
+import asyncio
 
 # Import search service
 from search_service import run_search, SearchRequest, format_results_for_api
@@ -243,6 +245,44 @@ class AdvancedDraftResponseModel(BaseModel):
     model_used: Dict[str, str]
 
 
+class SectionSimilarityModel(BaseModel):
+    section_name: str
+    section_text: str
+    similar_patents: List[Dict[str, Any]]
+    analysis_time: float
+    patent_count: int
+
+
+class AdvancedDraftWithSimilarityRequestModel(BaseModel):
+    """Request model for advanced drafting system with similarity search."""
+    description: str = Field(..., min_length=50, max_length=8000)
+    precision_model: str = "llama3.2:3b"
+    fluency_model: str = "mistral:7b"
+    use_ensemble: bool = True
+    use_scaffolding: bool = True
+    use_two_pass: bool = True
+    use_critique: bool = True
+    run_evaluation: bool = False
+    search_mode: str = "hybrid-advanced"
+    top_k: int = 5
+    include_snippets: bool = True
+
+
+class AdvancedDraftWithSimilarityResponseModel(BaseModel):
+    """Response model for advanced drafting system with similarity analysis."""
+    success: bool
+    message: str
+    sections: Dict[str, str]
+    glossary: Dict[str, Any]
+    outline: Optional[str] = None
+    critique_results: Optional[Dict[str, Any]] = None
+    evaluation_results: Optional[Dict[str, Any]] = None
+    generation_time: float
+    model_used: Dict[str, str]
+    section_similarities: Dict[str, SectionSimilarityModel]
+    total_analysis_time: float
+
+
 
 class DraftResponseModel(BaseModel):
     draft: str
@@ -252,6 +292,138 @@ class DraftResponseModel(BaseModel):
     cached: bool = False
     success: bool = True
     message: str = "Draft generated successfully"
+
+
+class SaveDraftRequestModel(BaseModel):
+    title: Optional[str] = None
+    content: str
+    model: Optional[str] = None
+    template_type: Optional[str] = None
+
+
+class SavedDraftModel(BaseModel):
+    id: str
+    title: Optional[str] = None
+    content: str
+    model: Optional[str] = None
+    template_type: Optional[str] = None
+    generation_time: Optional[float] = None
+    created_at: str
+
+
+@router.post("/drafts", response_model=SavedDraftModel)
+async def save_draft_endpoint(request: SaveDraftRequestModel):
+    """Save a generated draft to server-side storage (JSONL file)."""
+    try:
+        import uuid
+        from datetime import datetime
+        drafts_dir = Path("data/processed")
+        drafts_dir.mkdir(parents=True, exist_ok=True)
+        file_path = drafts_dir / "saved_drafts.jsonl"
+
+        draft_id = str(uuid.uuid4())
+        created_at = datetime.utcnow().isoformat() + "Z"
+
+        draft_entry = {
+            "id": draft_id,
+            "title": request.title or (request.content.splitlines()[0] if request.content else "Untitled Draft"),
+            "content": request.content,
+            "model": request.model,
+            "template_type": request.template_type,
+            "generation_time": None,
+            "created_at": created_at
+        }
+
+        with open(file_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(draft_entry) + "\n")
+
+        return draft_entry
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save draft: {str(e)}")
+
+
+@router.get("/drafts")
+async def list_drafts_endpoint():
+    """Return the list of saved drafts."""
+    try:
+        file_path = Path("data/processed/saved_drafts.jsonl")
+        if not file_path.exists():
+            return []
+
+        drafts = []
+        with open(file_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    drafts.append(json.loads(line))
+                except Exception:
+                    continue
+        # return most recent first
+        drafts.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+        return drafts
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list drafts: {str(e)}")
+
+
+@router.get("/drafts/{draft_id}")
+async def get_draft_endpoint(draft_id: str):
+    try:
+        file_path = Path("data/processed/saved_drafts.jsonl")
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="Draft not found")
+
+        with open(file_path, "r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    entry = json.loads(line)
+                    if entry.get("id") == draft_id:
+                        return entry
+                except Exception:
+                    continue
+
+        raise HTTPException(status_code=404, detail="Draft not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get draft: {str(e)}")
+
+
+@router.delete("/drafts/{draft_id}")
+async def delete_draft_endpoint(draft_id: str):
+    """Delete a saved draft by id (rewrites file excluding the deleted draft)."""
+    try:
+        file_path = Path("data/processed/saved_drafts.jsonl")
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="Draft not found")
+
+        kept = []
+        found = False
+        with open(file_path, "r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    entry = json.loads(line)
+                    if entry.get("id") == draft_id:
+                        found = True
+                        continue
+                    kept.append(entry)
+                except Exception:
+                    continue
+
+        if not found:
+            raise HTTPException(status_code=404, detail="Draft not found")
+
+        # Rewrite file
+        with open(file_path, "w", encoding="utf-8") as f:
+            for entry in kept:
+                f.write(json.dumps(entry) + "\n")
+
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete draft: {str(e)}")
 
 class DraftWithSearchRequestModel(DraftRequestModel):
     search_mode: str = "semantic"
@@ -293,14 +465,6 @@ class DraftWithSimilarityVisualizationModel(BaseModel):
     similarity_statistics: Dict[str, Any]
     search_mode: str
     search_top_k: int
-
-
-class SectionSimilarityModel(BaseModel):
-    section_name: str
-    section_text: str
-    similar_patents: List[Dict[str, Any]]
-    analysis_time: float
-    patent_count: int
 
 
 class DraftWithSimilarityRequestModel(BaseModel):
@@ -829,7 +993,7 @@ async def generate_draft_advanced_endpoint(request: AdvancedDraftRequestModel):
     """
     try:
         # Initialize advanced drafting system
-        drafting_system = get_advanced_drafting_system(
+        drafting_system: AdvancedPatentDraftingSystem = get_advanced_drafting_system(
             precision_model=request.precision_model,
             fluency_model=request.fluency_model
         )
@@ -897,6 +1061,186 @@ async def generate_draft_advanced_endpoint(request: AdvancedDraftRequestModel):
         raise HTTPException(status_code=500, detail=f"Advanced draft generation failed: {str(e)}\n\nDetails: {error_details}")
 
 
+@router.post("/generate_draft_advanced_with_similarity", response_model=AdvancedDraftWithSimilarityResponseModel)
+async def generate_draft_advanced_with_similarity_endpoint(request: AdvancedDraftWithSimilarityRequestModel):
+    """
+    Generate patent draft using the advanced 17-step system with concurrent similarity search.
+    Combines the advanced 17-step generation with background prior art analysis.
+    """
+    try:
+        # Get orchestration service
+        orchestration_service = get_orchestration_service()
+        
+        # Check if Ollama is available
+        ollama_service = get_ollama_service()
+        if not ollama_service.is_available():
+            raise HTTPException(
+                status_code=503, 
+                detail="Ollama service is not available. Please install and start Ollama."
+            )
+        
+        # Generate advanced draft with background similarity search
+        result = await orchestration_service.generate_advanced_with_similarity(
+            description=request.description,
+            precision_model=request.precision_model,
+            fluency_model=request.fluency_model,
+            use_ensemble=request.use_ensemble,
+            use_scaffolding=request.use_scaffolding,
+            use_two_pass=request.use_two_pass,
+            use_critique=request.use_critique,
+            search_mode=request.search_mode,
+            top_k=request.top_k,
+            include_snippets=request.include_snippets
+        )
+        
+        if not result.get("success"):
+            raise HTTPException(status_code=500, detail=result.get("message", "Unknown error"))
+        
+        # Convert similarity results to response model format
+        section_similarities = {}
+        for section_name, similarity in result.get("section_similarities", {}).items():
+            section_similarities[section_name] = SectionSimilarityModel(
+                section_name=similarity.section_name,
+                section_text=similarity.section_text,
+                similar_patents=similarity.similar_patents,
+                analysis_time=similarity.analysis_time,
+                patent_count=len(similarity.similar_patents)
+            )
+        
+        return AdvancedDraftWithSimilarityResponseModel(
+            success=True,
+            message="Advanced draft generated successfully with similarity analysis",
+            sections=result.get("sections", {}),
+            glossary=result.get("glossary", {}),
+            outline=result.get("outline"),
+            critique_results=result.get("critique_results"),
+            evaluation_results=None,
+            generation_time=result.get("generation_time", 0.0),
+            model_used=result.get("model_used", {}),
+            section_similarities=section_similarities,
+            total_analysis_time=result.get("total_analysis_time", 0.0)
+        )
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Error in generate_draft_advanced_with_similarity: {error_details}")
+        raise HTTPException(status_code=500, detail=f"Advanced draft generation with similarity failed: {str(e)}")
+
+
+@router.post("/generate_draft_advanced_with_similarity_stream")
+async def generate_draft_advanced_with_similarity_stream_endpoint(request: AdvancedDraftWithSimilarityRequestModel):
+    """
+    Generate patent draft using the advanced 17-step system with real-time section completion streaming.
+    Returns Server-Sent Events stream of section completions as they happen.
+    """
+    async def progress_generator():
+        """Generator that yields progress updates as sections complete."""
+        try:
+            # Check if Ollama is available
+            ollama_service = get_ollama_service()
+            if not ollama_service.is_available():
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Ollama service is not available'})}\n\n"
+                return
+            
+            # Queue for section completions
+            sections_queue: asyncio.Queue = asyncio.Queue()
+            
+            def on_section_callback(section_name: str, section_text: str):
+                """Callback invoked when a section completes."""
+                try:
+                    asyncio.run_coroutine_threadsafe(
+                        sections_queue.put((section_name, section_text)),
+                        asyncio.get_event_loop()
+                    )
+                except Exception as e:
+                    print(f"Error in section callback: {e}")
+            
+            # Start generation in a thread
+            loop = asyncio.get_event_loop()
+            
+            # Generate draft with callback
+            drafting_system = get_advanced_drafting_system(
+                precision_model=request.precision_model,
+                fluency_model=request.fluency_model
+            )
+            
+            # Run generation in executor to avoid blocking
+            generation_task = loop.run_in_executor(
+                None,
+                drafting_system.generate_complete_draft,
+                request.description,
+                request.use_ensemble,
+                request.use_scaffolding,
+                request.use_two_pass,
+                request.use_critique,
+                on_section_callback
+            )
+            
+            # Stream sections as they complete
+            completed_sections = {}
+            try:
+                while True:
+                    try:
+                        # Wait for a section with timeout
+                        section_name, section_text = await asyncio.wait_for(
+                            sections_queue.get(),
+                            timeout=1.0
+                        )
+                        completed_sections[section_name] = section_text
+                        
+                        # Send section completion event
+                        event_data = {
+                            'type': 'section_complete',
+                            'section_name': section_name,
+                            'section_text': section_text[:500] + '...' if len(section_text) > 500 else section_text,
+                            'total_sections': len(completed_sections)
+                        }
+                        yield f"data: {json.dumps(event_data)}\n\n"
+                        
+                    except asyncio.TimeoutError:
+                        # Check if generation is done
+                        if generation_task.done():
+                            break
+                        # Otherwise continue waiting
+                        continue
+                
+                # Wait for generation to complete
+                result = await generation_task
+                
+                if not result.get("success"):
+                    yield f"data: {json.dumps({'type': 'error', 'message': result.get('message', 'Unknown error')})}\n\n"
+                    return
+                
+                # Send final result
+                final_event = {
+                    'type': 'complete',
+                    'success': True,
+                    'total_sections': len(result.get('sections', {})),
+                    'generation_time': result.get('generation_time', 0.0)
+                }
+                yield f"data: {json.dumps(final_event)}\n\n"
+                
+            except Exception as e:
+                yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+                
+        except Exception as e:
+            print(f"Error in progress_generator: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+    
+    return StreamingResponse(
+        progress_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        }
+    )
+
 
 @router.post("/generate_draft_with_similarity", response_model=DraftWithSimilarityResponseModel)
 async def generate_draft_with_similarity_endpoint(request: DraftWithSimilarityRequestModel):
@@ -916,7 +1260,7 @@ async def generate_draft_with_similarity_endpoint(request: DraftWithSimilarityRe
             )
         
         # Generate draft with background search
-        result = await orchestration_service.generate_with_background_search(
+        result: DraftWithSimilarity = await orchestration_service.generate_with_background_search(
             prompt=request.description,
             search_mode=request.search_mode,
             model_name=request.model,
@@ -1196,26 +1540,26 @@ async def generate_draft_with_visualization_endpoint(request: DraftWithSearchReq
         
         # Convert to response models
         highlighted_sections = {}
-        for section_name, section_data in similarity_report["highlighted_sections"].items():
-            similarity_matches = [
-                SimilarityMatchModel(
-                    draft_text=match["draft_text"],
-                    prior_text=match["prior_text"],
-                    similarity_score=match["similarity_score"],
-                    prior_patent_id=match["prior_patent_id"],
-                    prior_title=match["prior_title"],
-                    section_type=match["section_type"]
-                )
-                for match in section_data["similarity_matches"]
-            ]
-            
-            highlighted_sections[section_name] = HighlightedSectionModel(
-                section_name=section_name,
-                text=section_data["text"],
-                html_output=section_data["html_output"],
-                markdown_output=section_data["markdown_output"],
-                similarity_matches=similarity_matches
-            )
+        # for section_name, section_data in similarity_report["highlighted_sections"].items():
+        #     similarity_matches = [
+        #         SimilarityMatchModel(
+        #             draft_text=match["draft_text"],
+        #             prior_text=match["prior_text"],
+        #             similarity_score=match["similarity_score"],
+        #             prior_patent_id=match["prior_patent_id"],
+        #             prior_title=match["prior_title"],
+        #             section_type=match["section_type"]
+        #         )
+        #         for match in section_data["similarity_matches"]
+        #     ]
+        #     
+        #     highlighted_sections[section_name] = HighlightedSectionModel(
+        #         section_name=section_name,
+        #         text=section_data["text"],
+        #         html_output=section_data["html_output"],
+        #         markdown_output=section_data["markdown_output"],
+        #         similarity_matches=similarity_matches
+        #     )
         
         return DraftWithSimilarityVisualizationModel(
             draft=draft_result.draft,
@@ -1225,7 +1569,7 @@ async def generate_draft_with_visualization_endpoint(request: DraftWithSearchReq
             cached=draft_result.cached,
             similar_patents=similar_patents,
             highlighted_sections=highlighted_sections,
-            similarity_statistics=similarity_report["statistics"],
+            similarity_statistics={},
             search_mode=request.search_mode,
             search_top_k=request.search_top_k
         )

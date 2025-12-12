@@ -10,6 +10,7 @@ const api = axios.create({
 });
 
 // Types for API requests and responses
+
 export interface SearchRequest {
   query: string;
   mode: 'tfidf' | 'semantic' | 'hybrid' | 'hybrid-advanced';
@@ -21,6 +22,12 @@ export interface SearchRequest {
   include_snippets?: boolean;
   include_metadata?: boolean;
   log_enabled?: boolean;
+}
+
+export interface ChunkDetail {
+  chunk_id: string;
+  chunk_score: number;
+  chunk_snippet: string;
 }
 
 export interface SearchResult {
@@ -36,6 +43,10 @@ export interface SearchResult {
   source_file?: string;
   base_doc_id?: string;
   score?: number;
+  chunk_details?: ChunkDetail[];
+  max_score?: number;
+  avg_score?: number;
+  chunk_count?: number;
 }
 
 export interface SearchResponse {
@@ -196,6 +207,39 @@ export interface AdvancedDraftResponse {
   model_used: Record<string, string>;
 }
 
+export interface AdvancedDraftWithSimilarityRequest {
+  description: string;
+  precision_model?: string;
+  fluency_model?: string;
+  use_ensemble?: boolean;
+  use_scaffolding?: boolean;
+  use_two_pass?: boolean;
+  use_critique?: boolean;
+  run_evaluation?: boolean;
+  search_mode?: 'tfidf' | 'semantic' | 'hybrid' | 'hybrid-advanced';
+  top_k?: number;
+  include_snippets?: boolean;
+}
+
+export interface AdvancedDraftWithSimilarityResponse {
+  success: boolean;
+  message: string;
+  sections: Record<string, string>;
+  glossary: Record<string, any>;
+  outline?: string;
+  critique_results?: Record<string, any>;
+  evaluation_results?: Record<string, any>;
+  generation_time: number;
+  model_used: Record<string, string>;
+  section_similarities: Record<string, SectionSimilarity>;
+  total_analysis_time: number;
+}
+
+export type StreamProgressEvent = 
+  | { type: 'section_complete'; section_name: string; section_text: string; total_sections: number }
+  | { type: 'complete'; success: boolean; total_sections: number; generation_time: number }
+  | { type: 'error'; message: string };
+
 
 export interface OllamaHealthResponse {
   status: string;
@@ -209,6 +253,66 @@ export interface OllamaModelsResponse {
   available_models: Record<string, string>;
   model_info: Record<string, any>;
   total_models: number;
+}
+
+export interface DraftWithSimilarityRequest {
+  description: string;
+  search_mode?: 'tfidf' | 'semantic' | 'hybrid' | 'hybrid-advanced';
+  model?: string;
+  template_type?: string;
+  top_k?: number;
+  include_snippets?: boolean;
+  use_cache?: boolean;
+}
+
+export interface SimilarPatent {
+  patent_id: string;
+  title?: string;
+  similarity_score: number;
+  doc_type?: string;
+  snippet?: string;
+  source_file?: string;
+  max_score?: number;
+  avg_score?: number;
+  chunk_count?: number;
+  chunk_details?: ChunkDetail[];
+}
+
+export interface SectionSimilarity {
+  section_name: string;
+  section_text: string;
+  similar_patents: SimilarPatent[];
+  analysis_time: number;
+  patent_count: number;
+}
+
+export interface DraftWithSimilarityResponse {
+  draft: string;
+  model: string;
+  template_type: string;
+  generation_time: number;
+  cached: boolean;
+  section_similarities: Record<string, SectionSimilarity>;
+  total_analysis_time: number;
+  success: boolean;
+  message: string;
+}
+
+export interface SaveDraftRequest {
+  title?: string;
+  content: string;
+  model?: string;
+  template_type?: string;
+}
+
+export interface SavedDraft {
+  id: string;
+  title?: string;
+  content: string;
+  model?: string;
+  template_type?: string;
+  generation_time?: number | null;
+  created_at: string;
 }
 
 // API functions
@@ -249,6 +353,23 @@ export const searchAPI = {
     const response = await api.get('/api/v1/health');
     return response.data;
   },
+  // Drafts management
+  saveDraft: async (request: SaveDraftRequest): Promise<SavedDraft> => {
+    const response = await api.post('/api/v1/drafts', request);
+    return response.data;
+  },
+  listDrafts: async (): Promise<SavedDraft[]> => {
+    const response = await api.get('/api/v1/drafts');
+    return response.data;
+  },
+  getDraft: async (id: string): Promise<SavedDraft> => {
+    const response = await api.get(`/api/v1/drafts/${id}`);
+    return response.data;
+  },
+  deleteDraft: async (id: string): Promise<{success: boolean}> => {
+    const response = await api.delete(`/api/v1/drafts/${id}`);
+    return response.data;
+  },
 };
 
 // Draft generation API
@@ -265,6 +386,65 @@ export const draftAPI = {
   
   generateDraftAdvanced: async (request: AdvancedDraftRequest): Promise<AdvancedDraftResponse> => {
     const response = await api.post('/api/v1/generate_draft_advanced', request);
+    return response.data;
+  },
+
+  generateDraftAdvancedWithSimilarity: async (request: AdvancedDraftWithSimilarityRequest): Promise<AdvancedDraftWithSimilarityResponse> => {
+    const response = await api.post('/api/v1/generate_draft_advanced_with_similarity', request);
+    return response.data;
+  },
+
+  generateDraftAdvancedWithSimilarityStream: async (
+    request: AdvancedDraftWithSimilarityRequest,
+    onProgress: (event: StreamProgressEvent) => void
+  ): Promise<void> => {
+    const response = await fetch(`${API_BASE_URL}/api/v1/generate_draft_advanced_with_similarity_stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('Response body is not readable');
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const eventData = JSON.parse(line.slice(6));
+              onProgress(eventData);
+            } catch (e) {
+              console.error('Error parsing event data:', e);
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  },
+
+  generateDraftWithSimilarity: async (request: DraftWithSimilarityRequest): Promise<DraftWithSimilarityResponse> => {
+    const response = await api.post('/api/v1/generate_draft_with_similarity', request);
     return response.data;
   },
 

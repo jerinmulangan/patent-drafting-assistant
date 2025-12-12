@@ -1532,9 +1532,19 @@ class AdvancedPatentDraftingSystem:
         use_ensemble: bool = True,
         use_scaffolding: bool = True,
         use_two_pass: bool = True,
-        use_critique: bool = True
+        use_critique: bool = True,
+        on_section_complete: Optional[callable] = None
     ) -> Dict[str, Any]:
-        """Generate complete patent draft following all 17 steps."""
+        """Generate complete patent draft following all 17 steps.
+        
+        Args:
+            invention_description: Description of the invention
+            use_ensemble: Whether to use ensemble of models
+            use_scaffolding: Whether to use scaffolding/outline
+            use_two_pass: Whether to use two-pass drafting
+            use_critique: Whether to use self-critique
+            on_section_complete: Optional callback function that receives (section_name, section_text)
+        """
         start_time = time.time()
         
         # Step 1: Model selection (already done in __init__)
@@ -1711,6 +1721,13 @@ Generate ONLY the refined section text. Remove ALL marketing language, performan
             )
             
             sections[section_name] = draft_text
+            
+            # Invoke callback if provided
+            if on_section_complete:
+                try:
+                    on_section_complete(section_name, draft_text)
+                except Exception as e:
+                    print(f"Warning: Callback error for {section_name}: {e}")
         
         # Step 8: Claims workbench
         print("Step 8: Generating claims via workbench...")
@@ -1763,6 +1780,13 @@ Generate ONLY the refined section text. Remove ALL marketing language, performan
             print("WARNING: Claims appear to be definitions, not statutory claims. The tighten_claims pass should fix this.")
         
         sections["CLAIMS"] = claims_tightened
+        
+        # Invoke callback for claims if provided
+        if on_section_complete:
+            try:
+                on_section_complete("CLAIMS", claims_tightened)
+            except Exception as e:
+                print(f"Warning: Callback error for CLAIMS: {e}")
         
         # Step 9: Self-critique
         critique_results = {}

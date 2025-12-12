@@ -131,7 +131,7 @@ const LogAnalysis: React.FC = () => {
                     <div className="ml-4">
                       <p className="text-sm font-medium text-gray-600">Log File</p>
                       <p className="text-sm font-bold text-gray-900 truncate">
-                        {analysis.log_file.split('/').pop()}
+                        {analysis.log_file ? analysis.log_file.split('/').pop() : 'N/A'}
                       </p>
                     </div>
                   </div>

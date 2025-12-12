@@ -89,30 +89,60 @@ class SectionSimilarityAnalyzer:
             return []
         
         try:
-            # Create search request
+            # Create search request with stricter matching parameters
+            # For hybrid-advanced, use higher semantic weight for better meaning-based matching
+            semantic_weight = 0.8 if search_mode == 'hybrid-advanced' else 0.7
+            tfidf_weight = 0.2 if search_mode == 'hybrid-advanced' else 0.3
+            
             request = SearchRequest(
                 query=section_text.strip(),
                 mode=search_mode,
                 top_k=top_k,
                 include_snippets=include_snippets,
                 include_metadata=True,
-                log_enabled=False
+                log_enabled=False,
+                rerank=True,  # Enable reranking for stricter relevance
+                semantic_weight=semantic_weight,
+                tfidf_weight=tfidf_weight if search_mode == 'hybrid-advanced' else None,
+                alpha=0.3 if search_mode == 'hybrid' else None  # Favor semantic for hybrid
             )
             
             # Run search
             search_results, _ = await self._run_search_async(request)
             
-            # Convert to similarity format
+            # Convert to similarity format and filter for stricter matching
             similar_patents = []
+            min_score_threshold = 0.15  # Minimum similarity score threshold for stricter matching
+            
             for result in search_results:
-                similar_patents.append({
-                    "patent_id": result.doc_id,
-                    "title": result.title,
-                    "similarity_score": result.score,
-                    "doc_type": result.doc_type,
-                    "snippet": result.snippet if include_snippets else "",
-                    "source_file": result.source_file
-                })
+                # Only include results above threshold for stricter matching
+                score = result.score if result.score else 0.0
+                if score >= min_score_threshold:
+                    # Convert chunk_details to dict format
+                    chunk_details_list = []
+                    if hasattr(result, 'chunk_details') and result.chunk_details:
+                        for chunk in result.chunk_details:
+                            chunk_details_list.append({
+                                "chunk_id": chunk.chunk_id if hasattr(chunk, 'chunk_id') else chunk.get('chunk_id', ''),
+                                "chunk_score": chunk.chunk_score if hasattr(chunk, 'chunk_score') else chunk.get('chunk_score', 0.0),
+                                "chunk_snippet": chunk.chunk_snippet if hasattr(chunk, 'chunk_snippet') else chunk.get('chunk_snippet', '')
+                            })
+                    
+                    similar_patents.append({
+                        "patent_id": result.doc_id,
+                        "title": result.title,
+                        "similarity_score": score,
+                        "doc_type": result.doc_type,
+                        "snippet": result.snippet if include_snippets else "",
+                        "source_file": result.source_file,
+                        "max_score": result.max_score if hasattr(result, 'max_score') else score,
+                        "avg_score": result.avg_score if hasattr(result, 'avg_score') else score,
+                        "chunk_count": result.chunk_count if hasattr(result, 'chunk_count') else 1,
+                        "chunk_details": chunk_details_list
+                    })
+                # Stop once we have enough results (already sorted by score)
+                if len(similar_patents) >= top_k:
+                    break
             
             return similar_patents
             
@@ -147,6 +177,9 @@ class SectionSimilarityAnalyzer:
         # Parse sections
         sections = self.parse_draft_sections(draft_text)
         
+        # Search with more candidates for stricter filtering (2x to allow filtering by score)
+        search_candidates = top_k * 2
+        
         # Create tasks for each section
         tasks = []
         for section_name, section_text in sections.items():
@@ -156,8 +189,9 @@ class SectionSimilarityAnalyzer:
                         section_name, 
                         section_text, 
                         search_mode, 
-                        top_k, 
-                        include_snippets
+                        search_candidates,  # Get more candidates for filtering
+                        include_snippets,
+                        final_top_k=top_k  # Return only top_k after filtering
                     )
                 )
                 tasks.append((section_name, task))
@@ -187,18 +221,26 @@ class SectionSimilarityAnalyzer:
         section_name: str,
         section_text: str,
         search_mode: str,
-        top_k: int,
-        include_snippets: bool
+        search_candidates: int,  # Number of candidates to search (more for filtering)
+        include_snippets: bool,
+        final_top_k: int = None  # Final number to return (defaults to search_candidates if not provided)
     ) -> SectionSimilarityResult:
         """Analyze a single section with timing."""
         start_time = time.time()
         
+        # Use final_top_k for filtering, or search_candidates if not specified
+        return_count = final_top_k if final_top_k else search_candidates
+        
         similar_patents = await self.analyze_similarity(
             section_text, 
             search_mode, 
-            top_k, 
+            search_candidates,  # Search for more candidates
             include_snippets
         )
+        
+        # Limit to final_top_k if specified (already filtered by analyze_similarity)
+        if final_top_k and len(similar_patents) > final_top_k:
+            similar_patents = similar_patents[:final_top_k]
         
         analysis_time = time.time() - start_time
         top_similarity_score = similar_patents[0]["similarity_score"] if similar_patents else 0.0

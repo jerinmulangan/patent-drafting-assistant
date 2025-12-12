@@ -17,7 +17,7 @@ from pathlib import Path
 from ollama_service import get_ollama_service
 from search_service import run_search, SearchRequest, SearchResult
 from search_utils import load_patent_metadata
-from section_similarity_analyzer import SectionSimilarityAnalyzer, get_section_similarity_map
+from section_similarity_analyzer import SectionSimilarityAnalyzer, get_section_similarity_map, SectionSimilarityResult
 
 
 @dataclass
@@ -98,7 +98,8 @@ class AsyncOrchestrationService:
                 search_results,
                 search_mode,
                 top_k,
-                include_snippets
+                include_snippets,
+                original_prompt=prompt  # Pass original prompt for fallback
             )
             
             total_time = time.time() - start_time
@@ -128,6 +129,132 @@ class AsyncOrchestrationService:
                 message=f"Error: {str(e)}"
             )
     
+    async def generate_advanced_with_similarity(
+        self,
+        description: str,
+        precision_model: str,
+        fluency_model: str,
+        use_ensemble: bool = True,
+        use_scaffolding: bool = True,
+        use_two_pass: bool = True,
+        use_critique: bool = True,
+        search_mode: str = 'hybrid-advanced',
+        top_k: int = 5,
+        include_snippets: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Generate patent draft using advanced 17-step system with concurrent similarity search.
+        
+        Args:
+            description: Invention description
+            precision_model: Model for precision generation
+            fluency_model: Model for fluency
+            use_ensemble: Whether to use ensemble methods
+            use_scaffolding: Whether to use scaffolding
+            use_two_pass: Whether to use two-pass generation
+            use_critique: Whether to use self-critique
+            search_mode: Search mode for similarity search
+            top_k: Number of similar patents to find
+            include_snippets: Whether to include text snippets
+            
+        Returns:
+            Dict with generated sections and similarity analysis
+        """
+        start_time = time.time()
+        
+        try:
+            # Import here to avoid circular imports
+            from patent_drafting_system import get_advanced_drafting_system
+            
+            # Get advanced drafting system
+            drafting_system = get_advanced_drafting_system(
+                precision_model=precision_model,
+                fluency_model=fluency_model
+            )
+            
+            # Start both advanced draft generation and search concurrently
+            draft_task = asyncio.create_task(
+                self._generate_advanced_draft_async(
+                    drafting_system,
+                    description,
+                    use_ensemble,
+                    use_scaffolding,
+                    use_two_pass,
+                    use_critique
+                )
+            )
+            search_task = asyncio.create_task(
+                self._search_patents_async(description, search_mode, top_k, include_snippets)
+            )
+            
+            # Wait for both to complete
+            draft_result, search_results = await asyncio.gather(draft_task, search_task)
+            
+            # Analyze similarity for each section in the advanced draft
+            section_similarities = await self._analyze_advanced_section_similarities(
+                draft_result,
+                search_results,
+                search_mode,
+                top_k,
+                include_snippets,
+                original_prompt=description
+            )
+            
+            total_time = time.time() - start_time
+            
+            return {
+                "sections": draft_result.get("sections", {}),
+                "glossary": draft_result.get("glossary", {}),
+                "outline": draft_result.get("outline"),
+                "critique_results": draft_result.get("critique_results"),
+                "model_used": draft_result.get("model_used", {}),
+                "generation_time": draft_result.get("generation_time", 0.0),
+                "section_similarities": section_similarities,
+                "total_analysis_time": total_time,
+                "success": True,
+                "message": "Advanced draft generated with similarity analysis"
+            }
+            
+        except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"Error in advanced generation with similarity: {error_details}")
+            return {
+                "sections": {},
+                "glossary": {},
+                "outline": None,
+                "critique_results": None,
+                "model_used": {},
+                "generation_time": 0.0,
+                "section_similarities": {},
+                "total_analysis_time": time.time() - start_time,
+                "success": False,
+                "message": f"Error: {str(e)}"
+            }
+    
+    async def _generate_advanced_draft_async(
+        self,
+        drafting_system: Any,
+        description: str,
+        use_ensemble: bool,
+        use_scaffolding: bool,
+        use_two_pass: bool,
+        use_critique: bool,
+        on_section_complete: Optional[callable] = None
+    ) -> Dict[str, Any]:
+        """Generate advanced draft asynchronously."""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            self.executor,
+            drafting_system.generate_complete_draft,
+            description,
+            use_ensemble,
+            use_scaffolding,
+            use_two_pass,
+            use_critique,
+            on_section_complete
+        )
+
     async def _generate_draft_async(
         self, 
         prompt: str, 
@@ -156,14 +283,22 @@ class AsyncOrchestrationService:
         """Search patents asynchronously."""
         loop = asyncio.get_event_loop()
         
-        # Create search request
+        # Create search request with stricter matching parameters
+        # For hybrid-advanced, use higher semantic weight for better meaning-based matching
+        semantic_weight = 0.8 if search_mode == 'hybrid-advanced' else 0.7
+        tfidf_weight = 0.2 if search_mode == 'hybrid-advanced' else 0.3
+        
         request = SearchRequest(
             query=query,
             mode=search_mode,
             top_k=top_k,
             include_snippets=include_snippets,
             include_metadata=True,
-            log_enabled=False
+            log_enabled=False,
+            rerank=True,  # Enable reranking for stricter relevance
+            semantic_weight=semantic_weight,
+            tfidf_weight=tfidf_weight if search_mode == 'hybrid-advanced' else None,
+            alpha=0.3 if search_mode == 'hybrid' else None  # Favor semantic for hybrid
         )
         
         return await loop.run_in_executor(
@@ -178,7 +313,8 @@ class AsyncOrchestrationService:
         search_results: Tuple[List[SearchResult], Dict[str, Any]],
         search_mode: str,
         top_k: int,
-        include_snippets: bool
+        include_snippets: bool,
+        original_prompt: str = None
     ) -> Dict[str, SectionSimilarity]:
         """Analyze similarity for each section of the generated draft."""
         # Use the dedicated section analyzer
@@ -189,6 +325,70 @@ class AsyncOrchestrationService:
             include_snippets=include_snippets
         )
         
+        # If no sections were found, do a general search using the original prompt
+        # This ensures we always return similarity results like the prior art system
+        if not section_results or len(section_results) == 0:
+            print("Warning: No sections parsed from draft, performing general similarity search on description")
+            start_time = time.time()
+            
+            # Use original prompt if available, otherwise use first part of draft
+            # Prefer original prompt as it's more focused on user's actual invention
+            query = original_prompt if original_prompt else draft[:1000]
+            
+            # Search with more candidates to filter to top_k with stricter matching
+            search_candidates = top_k * 2  # Get 2x candidates for filtering
+            general_results, _ = await self._search_patents_async(
+                query,
+                search_mode,
+                search_candidates,  # Get more candidates for stricter filtering
+                include_snippets
+            )
+            analysis_time = time.time() - start_time
+            
+            # Convert search results to similarity format with stricter filtering
+            similar_patents = []
+            min_score_threshold = 0.15  # Minimum similarity score threshold for stricter matching
+            
+            for result in general_results:
+                score = result.score if result.score else 0.0
+                # Only include results above threshold for stricter matching
+                if score >= min_score_threshold:
+                    # Convert chunk_details to dict format
+                    chunk_details_list = []
+                    if hasattr(result, 'chunk_details') and result.chunk_details:
+                        for chunk in result.chunk_details:
+                            chunk_details_list.append({
+                                "chunk_id": chunk.chunk_id if hasattr(chunk, 'chunk_id') else chunk.get('chunk_id', ''),
+                                "chunk_score": chunk.chunk_score if hasattr(chunk, 'chunk_score') else chunk.get('chunk_score', 0.0),
+                                "chunk_snippet": chunk.chunk_snippet if hasattr(chunk, 'chunk_snippet') else chunk.get('chunk_snippet', '')
+                            })
+                    
+                    similar_patents.append({
+                        "patent_id": result.doc_id,
+                        "title": result.title,
+                        "similarity_score": score,
+                        "doc_type": result.doc_type,
+                        "snippet": result.snippet if include_snippets else "",
+                        "source_file": result.source_file if hasattr(result, 'source_file') else None,
+                        "max_score": result.max_score if hasattr(result, 'max_score') else score,
+                        "avg_score": result.avg_score if hasattr(result, 'avg_score') else score,
+                        "chunk_count": result.chunk_count if hasattr(result, 'chunk_count') else 1,
+                        "chunk_details": chunk_details_list
+                    })
+                # Stop once we have enough results (already sorted by score)
+                if len(similar_patents) >= top_k:
+                    break
+            
+            # Return a single "General" section with results
+            section_results["general"] = SectionSimilarityResult(
+                section_name="Prior Art Search",
+                section_text=query[:500] + "..." if len(query) > 500 else query,
+                similar_patents=similar_patents,
+                analysis_time=analysis_time,
+                patent_count=len(similar_patents),
+                top_similarity_score=similar_patents[0]["similarity_score"] if similar_patents else 0.0
+            )
+        
         # Convert to SectionSimilarity format for compatibility
         section_similarities = {}
         for section_name, result in section_results.items():
@@ -198,6 +398,107 @@ class AsyncOrchestrationService:
                 similar_patents=result.similar_patents,
                 analysis_time=result.analysis_time
             )
+        
+        return section_similarities
+
+    async def _analyze_advanced_section_similarities(
+        self,
+        draft_result: Dict[str, Any],
+        search_results: Tuple[List[SearchResult], Dict[str, Any]],
+        search_mode: str,
+        top_k: int,
+        include_snippets: bool,
+        original_prompt: str = None
+    ) -> Dict[str, Any]:
+        """Analyze similarity for each section of the advanced generated draft."""
+        section_similarities = {}
+        sections = draft_result.get("sections", {})
+        
+        try:
+            # If no sections, do a general search
+            if not sections or len(sections) == 0:
+                print("Warning: No sections in advanced draft, performing general similarity search")
+                start_time = time.time()
+                
+                query = original_prompt if original_prompt else ""
+                search_candidates = top_k * 2
+                general_results, _ = await self._search_patents_async(
+                    query,
+                    search_mode,
+                    search_candidates,
+                    include_snippets
+                )
+                analysis_time = time.time() - start_time
+                
+                similar_patents = []
+                min_score_threshold = 0.15
+                
+                for result in general_results:
+                    score = result.score if result.score else 0.0
+                    if score >= min_score_threshold:
+                        # Convert chunk_details to dict format
+                        chunk_details_list = []
+                        if hasattr(result, 'chunk_details') and result.chunk_details:
+                            for chunk in result.chunk_details:
+                                chunk_details_list.append({
+                                    "chunk_id": chunk.chunk_id if hasattr(chunk, 'chunk_id') else chunk.get('chunk_id', ''),
+                                    "chunk_score": chunk.chunk_score if hasattr(chunk, 'chunk_score') else chunk.get('chunk_score', 0.0),
+                                    "chunk_snippet": chunk.chunk_snippet if hasattr(chunk, 'chunk_snippet') else chunk.get('chunk_snippet', '')
+                                })
+                        
+                        similar_patents.append({
+                            "patent_id": result.doc_id,
+                            "title": result.title,
+                            "similarity_score": score,
+                            "doc_type": result.doc_type,
+                            "snippet": result.snippet if include_snippets else "",
+                            "source_file": result.source_file if hasattr(result, 'source_file') else None,
+                            "max_score": result.max_score if hasattr(result, 'max_score') else score,
+                            "avg_score": result.avg_score if hasattr(result, 'avg_score') else score,
+                            "chunk_count": result.chunk_count if hasattr(result, 'chunk_count') else 1,
+                            "chunk_details": chunk_details_list
+                        })
+                    if len(similar_patents) >= top_k:
+                        break
+                
+                section_similarities["general"] = SectionSimilarity(
+                    section_name="Prior Art Search",
+                    section_text=query[:500] + "..." if len(query) > 500 else query,
+                    similar_patents=similar_patents,
+                    analysis_time=analysis_time
+                )
+            else:
+                # Analyze each section
+                for section_name, section_text in sections.items():
+                    if not section_text or not section_text.strip():
+                        continue
+                    
+                    # Skip very short sections (less than 50 chars)
+                    if len(section_text.strip()) < 50:
+                        continue
+                    
+                    # Search for this section with concurrency where possible
+                    try:
+                        similar = await self._analyze_single_section(
+                            section_name,
+                            section_text,
+                            search_mode,
+                            top_k,
+                            include_snippets
+                        )
+                        section_similarities[section_name] = similar
+                    except Exception as e:
+                        print(f"Error analyzing section {section_name}: {e}")
+                        # Return empty similarity for this section
+                        section_similarities[section_name] = SectionSimilarity(
+                            section_name=section_name,
+                            section_text=section_text[:500],
+                            similar_patents=[],
+                            analysis_time=0.0
+                        )
+            
+        except Exception as e:
+            print(f"Error in advanced section similarity analysis: {e}")
         
         return section_similarities
     
@@ -224,13 +525,27 @@ class AsyncOrchestrationService:
             # Convert to similarity format
             similar_patents = []
             for result in search_results:
+                # Convert chunk_details to dict format
+                chunk_details_list = []
+                if hasattr(result, 'chunk_details') and result.chunk_details:
+                    for chunk in result.chunk_details:
+                        chunk_details_list.append({
+                            "chunk_id": chunk.chunk_id if hasattr(chunk, 'chunk_id') else chunk.get('chunk_id', ''),
+                            "chunk_score": chunk.chunk_score if hasattr(chunk, 'chunk_score') else chunk.get('chunk_score', 0.0),
+                            "chunk_snippet": chunk.chunk_snippet if hasattr(chunk, 'chunk_snippet') else chunk.get('chunk_snippet', '')
+                        })
+                
                 similar_patents.append({
                     "patent_id": result.doc_id,
                     "title": result.title,
                     "similarity_score": result.score,
                     "doc_type": result.doc_type,
                     "snippet": result.snippet if include_snippets else "",
-                    "source_file": result.source_file
+                    "source_file": result.source_file,
+                    "max_score": result.max_score if hasattr(result, 'max_score') else result.score,
+                    "avg_score": result.avg_score if hasattr(result, 'avg_score') else result.score,
+                    "chunk_count": result.chunk_count if hasattr(result, 'chunk_count') else 1,
+                    "chunk_details": chunk_details_list
                 })
             
             analysis_time = time.time() - start_time

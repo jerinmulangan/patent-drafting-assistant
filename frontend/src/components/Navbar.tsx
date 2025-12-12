@@ -13,6 +13,7 @@ const Navbar: React.FC = () => {
     { path: '/batch', label: 'Batch Search', icon: Upload },
     { path: '/logs', label: 'Analytics', icon: TrendingUp },
     { path: '/draft', label: 'Draft Assistant', icon: FileText },
+    { path: '/saved-drafts', label: 'Saved Drafts', icon: FileText },
     { path: '/about', label: 'About', icon: Info },
   ];
 
