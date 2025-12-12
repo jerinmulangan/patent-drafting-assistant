@@ -1152,11 +1152,11 @@ async def generate_draft_advanced_with_similarity_stream_endpoint(request: Advan
             
             def on_section_callback(section_name: str, section_text: str):
                 """Callback invoked when a section completes."""
+                async def put_in_queue():
+                    await sections_queue.put((section_name, section_text))
+                
                 try:
-                    asyncio.run_coroutine_threadsafe(
-                        sections_queue.put((section_name, section_text)),
-                        asyncio.get_event_loop()
-                    )
+                    asyncio.run(put_in_queue())
                 except Exception as e:
                     print(f"Error in section callback: {e}")
             
